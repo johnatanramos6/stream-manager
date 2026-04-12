@@ -8,13 +8,15 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Search, Tv } from 'lucide-react';
 import { toast } from 'sonner';
+import { seedData } from '@/data/seedData';
 
 const STORAGE_KEY = 'streaming-subscriptions';
 
 function loadSubs(): Subscription[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (raw) return JSON.parse(raw);
+    return [...seedData];
   } catch { return []; }
 }
 
