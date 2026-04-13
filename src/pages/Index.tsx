@@ -3,10 +3,11 @@ import { Subscription, Platform, PaymentStatus, PLATFORMS } from '@/types/subscr
 import SubscriptionForm from '@/components/SubscriptionForm';
 import SubscriptionTable from '@/components/SubscriptionTable';
 import StatsBar from '@/components/StatsBar';
+import FinanceSection from '@/components/FinanceSection';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Tv } from 'lucide-react';
+import { Plus, Search, Tv, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 import { seedData } from '@/data/seedData';
 
@@ -17,7 +18,6 @@ function loadSubs(): Subscription[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     const version = localStorage.getItem(STORAGE_KEY + '-version');
     if (raw && version === '2026-v2') return JSON.parse(raw);
-    // Force reload with new data
     localStorage.removeItem(STORAGE_KEY);
     localStorage.setItem(STORAGE_KEY + '-version', '2026-v2');
     return [...seedData];
@@ -35,6 +35,7 @@ export default function Index() {
   const [search, setSearch] = useState('');
   const [filterPlatform, setFilterPlatform] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState<'clients' | 'finance'>('clients');
 
   useEffect(() => { saveSubs(subs); }, [subs]);
 
@@ -76,7 +77,6 @@ export default function Index() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -88,45 +88,69 @@ export default function Index() {
               <p className="text-xs text-muted-foreground">Control de suscripciones</p>
             </div>
           </div>
-          <Button onClick={() => { setEditing(null); setFormOpen(true); }} className="gap-2">
-            <Plus className="h-4 w-4" /> Agregar
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Tab buttons */}
+            <div className="flex bg-muted rounded-lg p-1 mr-2">
+              <button
+                onClick={() => setActiveTab('clients')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${activeTab === 'clients' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                <Tv className="h-3.5 w-3.5 inline mr-1" />
+                Clientes
+              </button>
+              <button
+                onClick={() => setActiveTab('finance')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${activeTab === 'finance' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                <DollarSign className="h-3.5 w-3.5 inline mr-1" />
+                Finanzas
+              </button>
+            </div>
+            {activeTab === 'clients' && (
+              <Button onClick={() => { setEditing(null); setFormOpen(true); }} className="gap-2">
+                <Plus className="h-4 w-4" /> Agregar
+              </Button>
+            )}
+          </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-        <StatsBar subscriptions={subs} />
-
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar cliente o correo..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
-          </div>
-          <Select value={filterPlatform} onValueChange={setFilterPlatform}>
-            <SelectTrigger className="w-[180px]"><SelectValue placeholder="Plataforma" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
-              {PLATFORMS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[150px]"><SelectValue placeholder="Estado" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="pagado">✅ Pagado</SelectItem>
-              <SelectItem value="debe">⚠️ Debe</SelectItem>
-              <SelectItem value="cobrar">🔴 Cobrar</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <SubscriptionTable
-          subscriptions={filtered}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onTogglePayment={handleTogglePayment}
-        />
+        {activeTab === 'clients' ? (
+          <>
+            <StatsBar subscriptions={subs} />
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Buscar cliente o correo..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+              </div>
+              <Select value={filterPlatform} onValueChange={setFilterPlatform}>
+                <SelectTrigger className="w-[180px]"><SelectValue placeholder="Plataforma" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {PLATFORMS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-[150px]"><SelectValue placeholder="Estado" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="pagado">✅ Pagado</SelectItem>
+                  <SelectItem value="debe">⚠️ Debe</SelectItem>
+                  <SelectItem value="cobrar">🔴 Cobrar</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <SubscriptionTable
+              subscriptions={filtered}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onTogglePayment={handleTogglePayment}
+            />
+          </>
+        ) : (
+          <FinanceSection subscriptions={subs} />
+        )}
       </main>
 
       <SubscriptionForm
