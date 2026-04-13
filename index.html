@@ -14,13 +14,13 @@
     <meta name="twitter:card" content="summary_large_image" />
 
     <!-- PWA -->
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="manifest" href="/stream-manager/manifest.json" />
     <meta name="theme-color" content="#4338ca" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="StreamManager" />
-    <link rel="apple-touch-icon" href="/icon-512.png" />
-    <link rel="icon" type="image/png" href="/icon-512.png" />
+    <link rel="apple-touch-icon" href="/stream-manager/icon-512.png" />
+    <link rel="icon" type="image/png" href="/stream-manager/icon-512.png" />
   </head>
 
   <body>
@@ -29,7 +29,7 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
+          navigator.serviceWorker.register('/stream-manager/sw.js').catch(() => {});
         });
       }
     </script>

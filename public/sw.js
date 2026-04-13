@@ -1,9 +1,9 @@
-const CACHE_NAME = 'streammanager-v1';
+const CACHE_NAME = 'streammanager-v2';
 const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/icon-512.png',
-  '/manifest.json',
+  '/stream-manager/',
+  '/stream-manager/index.html',
+  '/stream-manager/icon-512.png',
+  '/stream-manager/manifest.json',
 ];
 
 // Install — cache essential assets
@@ -55,7 +55,7 @@ self.addEventListener('fetch', (event) => {
           if (cached) return cached;
           // For navigation requests, return the cached index.html
           if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
+            return caches.match('/stream-manager/index.html');
           }
           return new Response('Offline', { status: 503, statusText: 'Offline' });
         });
