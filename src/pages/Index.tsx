@@ -15,7 +15,11 @@ const STORAGE_KEY = 'streaming-subscriptions';
 function loadSubs(): Subscription[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    const version = localStorage.getItem(STORAGE_KEY + '-version');
+    if (raw && version === '2026-v2') return JSON.parse(raw);
+    // Force reload with new data
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.setItem(STORAGE_KEY + '-version', '2026-v2');
     return [...seedData];
   } catch { return []; }
 }
