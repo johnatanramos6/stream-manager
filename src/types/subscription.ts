@@ -51,7 +51,7 @@ export function getPlatformClass(platform: Platform): string {
 }
 
 export function getNextPaymentDate(purchaseDate: string): Date {
-  const purchase = new Date(purchaseDate);
+  const purchase = new Date(purchaseDate + 'T12:00:00');
   const now = new Date();
   const next = new Date(purchase);
   
