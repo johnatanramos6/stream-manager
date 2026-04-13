@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Subscription, PLATFORMS, Platform, PaymentStatus } from '@/types/subscription';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -30,6 +30,12 @@ export default function SubscriptionForm({ open, onClose, onSave, initial }: Pro
   const [form, setForm] = useState<Omit<Subscription, 'id'>>(
     initial ? { ...initial } : empty
   );
+
+  useEffect(() => {
+    if (open) {
+      setForm(initial ? { ...initial } : empty);
+    }
+  }, [open, initial]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
