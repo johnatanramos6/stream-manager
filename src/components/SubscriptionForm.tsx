@@ -31,6 +31,18 @@ export default function SubscriptionForm({ open, onClose, onSave, initial }: Pro
     initial ? { ...initial } : empty
   );
 
+  // Sync form state when initial changes (e.g., opening edit for a different subscription)
+  useState(() => {});
+  const prevInitialRef = useState<Subscription | null | undefined>(undefined);
+  if (prevInitialRef[0] !== initial) {
+    prevInitialRef[1](initial);
+    if (initial) {
+      setForm({ ...initial });
+    } else if (!open) {
+      setForm(empty);
+    }
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave({
