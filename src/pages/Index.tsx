@@ -5,6 +5,7 @@ import SubscriptionTable from '@/components/SubscriptionTable';
 import StatsBar from '@/components/StatsBar';
 import FinanceSection from '@/components/FinanceSection';
 import ThemeToggle from '@/components/ThemeToggle';
+import InstallPWA from '@/components/InstallPWA';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -275,6 +276,8 @@ export default function Index() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <InstallPWA />
     </div>
   );
 }
