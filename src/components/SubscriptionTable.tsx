@@ -180,7 +180,13 @@ export default function SubscriptionTable({ subscriptions, onEdit, onDelete, onT
           return (
             <div
               key={sub.id}
-              className={`mobile-card ${rowStatus === 'danger' ? 'border-destructive/40' : rowStatus === 'warning' ? 'border-yellow-500/40' : ''}`}
+              className={`mobile-card relative overflow-hidden ${
+                rowStatus === 'danger'
+                  ? 'border-l-4 border-l-destructive border-destructive/30 bg-destructive/5 shadow-[0_4px_12px_rgba(239,68,68,0.15)]'
+                  : rowStatus === 'warning'
+                    ? 'border-l-4 border-l-yellow-500 border-yellow-500/30 bg-yellow-500/5 shadow-[0_4px_12px_rgba(234,179,8,0.15)]'
+                    : ''
+              }`}
               style={{ animationDelay: `${i * 50}ms` }}
             >
               {/* Top row: platform + status + actions */}
