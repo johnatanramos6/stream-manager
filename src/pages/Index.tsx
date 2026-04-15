@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Subscription, Platform, PaymentStatus, PLATFORMS } from '@/types/subscription';
+import { Subscription, Platform, PaymentStatus, PLATFORMS, getDaysUntilPayment } from '@/types/subscription';
 import SubscriptionForm from '@/components/SubscriptionForm';
 import SubscriptionTable from '@/components/SubscriptionTable';
 import StatsBar, { QuickFilter } from '@/components/StatsBar';
