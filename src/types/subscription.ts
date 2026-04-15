@@ -22,6 +22,7 @@ export interface Subscription {
   paymentStatus: PaymentStatus;
   notes: string;
   accountName?: string; // optional grouping label
+  salePriceOverride?: number; // Precio de cobro específico acordado (IPTV combos)
 }
 
 export const PLATFORMS: Platform[] = [

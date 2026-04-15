@@ -28,61 +28,51 @@ export default function FinanceSection({ subscriptions }: Props) {
   const stats = useMemo(() => {
     const pricingMap = new Map(pricing.map(p => [p.platform, p]));
 
-    // Group by unique account (using email as primary grouping key)
-    const uniqueAccounts = new Map<string, { platform: string; clients: number }>();
+    const platformStatsMap = new Map<string, { accounts: number; clients: number; revenue: number; cost: number; profit: number; marginPercent: number }>();
+    const uniqueAccounts = new Set<string>();
+
     subscriptions.forEach(sub => {
-      // Si no tiene correo, cuenta como una cuenta individual separada
+      const p = pricingMap.get(sub.platform);
+      
+      // Calculate revenue (using override if provided for IPTV combinations or individual deals)
+      const salePrice = p ? p.salePrice : 0;
+      const actualRevenue = sub.salePriceOverride ?? salePrice;
+
+      const ps = platformStatsMap.get(sub.platform) || { accounts: 0, clients: 0, revenue: 0, cost: 0, profit: 0, marginPercent: 0 };
+      ps.clients++;
+      ps.revenue += actualRevenue;
+
+      // Grouping logic for accounts
       const key = sub.accountEmail
         ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}`
         : `ungrouped::${sub.id}`;
-        
-      const existing = uniqueAccounts.get(key);
-      if (existing) {
-        existing.clients++;
-      } else {
-        uniqueAccounts.set(key, { platform: sub.platform, clients: 1 });
+
+      if (!uniqueAccounts.has(key)) {
+        uniqueAccounts.add(key);
+        ps.accounts++;
       }
+
+      platformStatsMap.set(sub.platform, ps);
     });
 
     let totalRevenue = 0;
     let totalCost = 0;
+    const platformStats: { platform: string; accounts: number; clients: number; cost: number; revenue: number; profit: number; marginPercent: number }[] = [];
 
-    const platformStats: {
-      platform: string;
-      accounts: number;
-      clients: number;
-      cost: number;
-      revenue: number;
-      profit: number;
-      marginPercent: number;
-    }[] = [];
+    platformStatsMap.forEach((ps, platform) => {
+      // @ts-ignore - backward compatibility for items missing costType
+      const p = pricingMap.get(platform) || { costPrice: 0, salePrice: 0, costType: platform === 'IPTV Premium' ? 'per_account' : 'per_screen' };
+      const cType = (p as any).costType || (platform === 'IPTV Premium' ? 'per_account' : 'per_screen');
 
-    const platformAccounts = new Map<string, { accounts: number; clients: number }>();
-    uniqueAccounts.forEach(({ platform, clients }) => {
-      const existing = platformAccounts.get(platform) || { accounts: 0, clients: 0 };
-      existing.accounts++;
-      existing.clients += clients;
-      platformAccounts.set(platform, existing);
-    });
+      // Si es de tipo cuenta, el costo se multiplica por las cuentas únicas. Si es por pantalla, se multiplica por cuántos clientes hay.
+      ps.cost = cType === 'per_account' ? (ps.accounts * p.costPrice) : (ps.clients * p.costPrice);
+      ps.profit = ps.revenue - ps.cost;
+      ps.marginPercent = ps.revenue > 0 ? (ps.profit / ps.revenue) * 100 : 0;
 
-    platformAccounts.forEach((data, platform) => {
-      const p = pricingMap.get(platform) || { costPrice: 0, salePrice: 0 };
-      const cost = data.accounts * p.costPrice;
-      const revenue = data.clients * p.salePrice;
-      const profit = revenue - cost;
+      totalCost += ps.cost;
+      totalRevenue += ps.revenue;
 
-      totalCost += cost;
-      totalRevenue += revenue;
-
-      platformStats.push({
-        platform,
-        accounts: data.accounts,
-        clients: data.clients,
-        cost,
-        revenue,
-        profit,
-        marginPercent: revenue > 0 ? (profit / revenue) * 100 : 0,
-      });
+      platformStats.push({ platform, ...ps });
     });
 
     platformStats.sort((a, b) => b.profit - a.profit);
@@ -93,7 +83,8 @@ export default function FinanceSection({ subscriptions }: Props) {
       .filter(s => s.paymentStatus === 'debe' || s.paymentStatus === 'cobrar')
       .reduce((acc, s) => {
         const p = pricingMap.get(s.platform);
-        return acc + (p?.salePrice || 0);
+        const actualPrice = s.salePriceOverride ?? (p?.salePrice || 0);
+        return acc + actualPrice;
       }, 0);
 
     return { totalRevenue, totalCost, totalProfit: totalRevenue - totalCost, platformStats, totalClients: subscriptions.length, pendingCount, pendingAmount };
