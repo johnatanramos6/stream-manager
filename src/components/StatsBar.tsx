@@ -2,8 +2,11 @@ import { Subscription, getDaysUntilPayment } from '@/types/subscription';
 import { Tv, AlertTriangle, CheckCircle, DollarSign } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+export type QuickFilter = 'all' | 'pagado' | 'debt' | 'urgent';
+
 interface Props {
   subscriptions: Subscription[];
+  onStatClick?: (filter: QuickFilter) => void;
 }
 
 function AnimatedNumber({ value }: { value: number }) {
@@ -28,17 +31,17 @@ function AnimatedNumber({ value }: { value: number }) {
   return <span>{display}</span>;
 }
 
-export default function StatsBar({ subscriptions }: Props) {
+export default function StatsBar({ subscriptions, onStatClick }: Props) {
   const total = subscriptions.length;
   const paid = subscriptions.filter(s => s.paymentStatus === 'pagado').length;
-  const owing = subscriptions.filter(s => s.paymentStatus === 'debe').length;
+  const owing = subscriptions.filter(s => s.paymentStatus === 'debe' || s.paymentStatus === 'cobrar').length;
   const urgent = subscriptions.filter(s => getDaysUntilPayment(s.purchaseDate) <= 2).length;
 
   const stats = [
-    { label: 'Total clientes', value: total, icon: Tv, color: 'text-primary', bg: 'stat-gradient-primary', iconBg: 'bg-primary/10' },
-    { label: 'Pagados', value: paid, icon: CheckCircle, color: 'text-emerald-500', bg: 'stat-gradient-success', iconBg: 'bg-emerald-500/10' },
-    { label: 'Deben', value: owing, icon: DollarSign, color: 'text-amber-500', bg: 'stat-gradient-warning', iconBg: 'bg-amber-500/10' },
-    { label: 'Próx. a vencer', value: urgent, icon: AlertTriangle, color: 'text-destructive', bg: 'stat-gradient-danger', iconBg: 'bg-destructive/10' },
+    { id: 'all', label: 'Total clientes', value: total, icon: Tv, color: 'text-primary', bg: 'stat-gradient-primary', iconBg: 'bg-primary/10' },
+    { id: 'pagado', label: 'Pagados', value: paid, icon: CheckCircle, color: 'text-emerald-500', bg: 'stat-gradient-success', iconBg: 'bg-emerald-500/10' },
+    { id: 'debt', label: 'Deben', value: owing, icon: DollarSign, color: 'text-amber-500', bg: 'stat-gradient-warning', iconBg: 'bg-amber-500/10' },
+    { id: 'urgent', label: 'Próx. a vencer', value: urgent, icon: AlertTriangle, color: 'text-destructive', bg: 'stat-gradient-danger', iconBg: 'bg-destructive/10' },
   ];
 
   return (
@@ -46,7 +49,8 @@ export default function StatsBar({ subscriptions }: Props) {
       {stats.map((s, i) => (
         <div
           key={s.label}
-          className={`${s.bg} rounded-xl border p-4 flex items-center gap-3 card-hover animate-fade-in-up delay-${i + 1}`}
+          onClick={() => onStatClick?.(s.id as QuickFilter)}
+          className={`${s.bg} rounded-xl border p-4 flex items-center gap-3 card-hover animate-fade-in-up delay-${i + 1} ${onStatClick ? 'cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all' : ''}`}
         >
           <div className={`${s.iconBg} ${s.color} rounded-xl p-2.5`}>
             <s.icon className="h-5 w-5" />

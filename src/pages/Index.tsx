@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Subscription, Platform, PaymentStatus, PLATFORMS } from '@/types/subscription';
 import SubscriptionForm from '@/components/SubscriptionForm';
 import SubscriptionTable from '@/components/SubscriptionTable';
-import StatsBar from '@/components/StatsBar';
+import StatsBar, { QuickFilter } from '@/components/StatsBar';
 import FinanceSection from '@/components/FinanceSection';
 import ThemeToggle from '@/components/ThemeToggle';
 import InstallPWA from '@/components/InstallPWA';
@@ -58,6 +58,7 @@ export default function Index() {
   const [activeTab, setActiveTab] = useState<'clients' | 'finance'>('clients');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
 
   useEffect(() => { saveSubs(subs); }, [subs]);
 
@@ -98,13 +99,26 @@ export default function Index() {
   };
 
   const filtered = subs.filter(s => {
+    // Top bar filters
     if (search && !s.clientName.toLowerCase().includes(search.toLowerCase()) && !s.accountEmail.toLowerCase().includes(search.toLowerCase())) return false;
     if (filterPlatform !== 'all' && s.platform !== filterPlatform) return false;
     if (filterStatus !== 'all' && s.paymentStatus !== filterStatus) return false;
+    
+    // Quick filters from Stats
+    if (quickFilter === 'pagado' && s.paymentStatus !== 'pagado') return false;
+    if (quickFilter === 'debt' && s.paymentStatus !== 'debe' && s.paymentStatus !== 'cobrar') return false;
+    if (quickFilter === 'urgent' && getDaysUntilPayment(s.purchaseDate) > 2) return false;
+
     return true;
   });
 
-  const hasActiveFilters = filterPlatform !== 'all' || filterStatus !== 'all' || search.length > 0;
+  const hasActiveFilters = filterPlatform !== 'all' || filterStatus !== 'all' || search.length > 0 || quickFilter !== 'all';
+
+  const handleStatClick = (filter: QuickFilter) => {
+    setQuickFilter(filter);
+    setFilterStatus('all'); // Clear dropdown filter so it doesn't conflict
+    setActiveTab('clients'); // Make sure we're viewing the list
+  };
 
   return (
     <div className="min-h-screen bg-background transition-colors duration-300">
@@ -160,7 +174,7 @@ export default function Index() {
       <main className="max-w-7xl mx-auto px-4 py-5 space-y-5 pb-24 sm:pb-6">
         {activeTab === 'clients' ? (
           <>
-            <StatsBar subscriptions={subs} />
+            <StatsBar subscriptions={subs} onStatClick={handleStatClick} />
 
             {/* ── Filters: Desktop ── */}
             <div className="hidden sm:flex flex-row gap-3 animate-fade-in">
@@ -175,7 +189,7 @@ export default function Index() {
                   {PLATFORMS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <Select value={filterStatus} onValueChange={v => { setFilterStatus(v); setQuickFilter('all'); }}>
                 <SelectTrigger className="w-[150px]"><SelectValue placeholder="Estado" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
@@ -212,7 +226,7 @@ export default function Index() {
                       {PLATFORMS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <Select value={filterStatus} onValueChange={v => { setFilterStatus(v); setQuickFilter('all'); }}>
                     <SelectTrigger className="flex-1 h-9 text-xs"><SelectValue placeholder="Estado" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos</SelectItem>
