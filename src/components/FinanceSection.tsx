@@ -28,10 +28,14 @@ export default function FinanceSection({ subscriptions }: Props) {
   const stats = useMemo(() => {
     const pricingMap = new Map(pricing.map(p => [p.platform, p]));
 
-    // Group by unique account (accountEmail + accountPassword combo)
+    // Group by unique account (using email as primary grouping key)
     const uniqueAccounts = new Map<string, { platform: string; clients: number }>();
     subscriptions.forEach(sub => {
-      const key = `${sub.platform}::${sub.accountEmail}::${sub.accountPassword}`;
+      // Si no tiene correo, cuenta como una cuenta individual separada
+      const key = sub.accountEmail
+        ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}`
+        : `ungrouped::${sub.id}`;
+        
       const existing = uniqueAccounts.get(key);
       if (existing) {
         existing.clients++;
@@ -50,7 +54,7 @@ export default function FinanceSection({ subscriptions }: Props) {
       cost: number;
       revenue: number;
       profit: number;
-      profitPerScreen: number;
+      marginPercent: number;
     }[] = [];
 
     const platformAccounts = new Map<string, { accounts: number; clients: number }>();
@@ -77,7 +81,7 @@ export default function FinanceSection({ subscriptions }: Props) {
         cost,
         revenue,
         profit,
-        profitPerScreen: data.clients > 0 ? profit / data.clients : 0,
+        marginPercent: revenue > 0 ? (profit / revenue) * 100 : 0,
       });
     });
 
@@ -179,8 +183,8 @@ export default function FinanceSection({ subscriptions }: Props) {
                 <th className="text-right p-3 font-semibold">Pantallas</th>
                 <th className="text-right p-3 font-semibold">Costo</th>
                 <th className="text-right p-3 font-semibold">Ingresos</th>
-                <th className="text-right p-3 font-semibold">Ganancia</th>
-                <th className="text-right p-3 font-semibold">Por pantalla</th>
+                <th className="text-right p-3 font-semibold">Ganancia Neta</th>
+                <th className="text-right p-3 font-semibold">Margen</th>
               </tr>
             </thead>
             <tbody>
@@ -192,7 +196,7 @@ export default function FinanceSection({ subscriptions }: Props) {
                   <td className="p-3 text-right text-destructive">{formatCOP(ps.cost)}</td>
                   <td className="p-3 text-right">{formatCOP(ps.revenue)}</td>
                   <td className="p-3 text-right font-bold text-emerald-600 dark:text-emerald-400">{formatCOP(ps.profit)}</td>
-                  <td className="p-3 text-right text-muted-foreground">{formatCOP(ps.profitPerScreen)}</td>
+                  <td className="p-3 text-right text-muted-foreground">{ps.marginPercent.toFixed(1)}%</td>
                 </tr>
               ))}
             </tbody>
@@ -204,7 +208,9 @@ export default function FinanceSection({ subscriptions }: Props) {
                 <td className="p-3 text-right text-destructive">{formatCOP(stats.totalCost)}</td>
                 <td className="p-3 text-right">{formatCOP(stats.totalRevenue)}</td>
                 <td className="p-3 text-right text-emerald-600 dark:text-emerald-400">{formatCOP(stats.totalProfit)}</td>
-                <td className="p-3 text-right text-muted-foreground">{stats.totalClients > 0 ? formatCOP(stats.totalProfit / stats.totalClients) : '$0'}</td>
+                <td className="p-3 text-right text-muted-foreground">
+                  {stats.totalRevenue > 0 ? ((stats.totalProfit / stats.totalRevenue) * 100).toFixed(1) : '0.0'}%
+                </td>
               </tr>
             </tfoot>
           </table>
@@ -231,9 +237,8 @@ export default function FinanceSection({ subscriptions }: Props) {
             <thead>
               <tr className="bg-muted/50">
                 <th className="text-left p-3 font-semibold">Plataforma</th>
-                <th className="text-right p-3 font-semibold">Precio compra (cuenta)</th>
-                <th className="text-right p-3 font-semibold">Precio venta (pantalla)</th>
-                <th className="text-right p-3 font-semibold">Margen por pantalla</th>
+                <th className="text-right p-3 font-semibold">Costo COMPRA (por Cuenta)</th>
+                <th className="text-right p-3 font-semibold">Precio VENTA (por Pantalla)</th>
               </tr>
             </thead>
             <tbody>
@@ -250,7 +255,6 @@ export default function FinanceSection({ subscriptions }: Props) {
                       <Input type="number" value={p.salePrice} onChange={e => handlePricingChange(i, 'salePrice', e.target.value)} className="w-28 ml-auto text-right" />
                     ) : formatCOP(p.salePrice)}
                   </td>
-                  <td className="p-3 text-right font-bold text-emerald-600 dark:text-emerald-400">{formatCOP(p.salePrice - p.costPrice)}</td>
                 </tr>
               ))}
             </tbody>
