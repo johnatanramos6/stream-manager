@@ -233,8 +233,8 @@ export default function Index() {
             {activeTab === 'clients' && (
               <>
                 <input type="file" accept=".csv" ref={fileInputRef} className="hidden" onChange={handleImportCSV} />
-                <Button variant="outline" size="sm" className="hidden sm:flex gap-1.5 px-3 text-xs" onClick={() => fileInputRef.current?.click()}>
-                  <Upload className="h-3.5 w-3.5" /> <span className="hidden lg:inline">Importar</span>
+                <Button variant="outline" size="sm" className="flex gap-1.5 px-2 sm:px-3 text-xs" onClick={() => fileInputRef.current?.click()} title="Importar">
+                  <Upload className="h-4 w-4 sm:h-3.5 sm:w-3.5" /> <span className="hidden lg:inline">Importar</span>
                 </Button>
                 <Button variant="outline" size="sm" className="flex gap-1.5 px-2 sm:px-3 text-xs" onClick={() => exportCSV(subs)}>
                   <Download className="h-4 w-4 sm:h-3.5 sm:w-3.5" /> <span className="hidden sm:inline">Excel/CSV</span>
