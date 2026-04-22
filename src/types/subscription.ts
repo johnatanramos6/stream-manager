@@ -8,6 +8,7 @@ export interface Subscription {
   accountEmail: string;
   accountPassword: string;
   clientName: string;
+  clientPhone?: string; // Número de contacto/Whatsapp
   purchaseDate: string; // ISO date string
   profilePin: string;
   paymentStatus: PaymentStatus;

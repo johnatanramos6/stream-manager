@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Plus, Search, Tv, DollarSign, Download, Filter, X } from 'lucide-react';
+import { Plus, Search, Tv, DollarSign, Download, Upload, Filter, X } from 'lucide-react';
+import { useRef } from 'react';
 import { toast } from 'sonner';
 import { seedData } from '@/data/seedData';
 
@@ -33,9 +34,9 @@ function saveSubs(subs: Subscription[]) {
 }
 
 function exportCSV(subs: Subscription[]) {
-  const headers = ['Cliente', 'Plataforma', 'Correo', 'Contraseña', 'PIN', 'Fecha Adquisición', 'Estado', 'Notas', 'Nombre Cuenta', 'Precio Acordado'];
+  const headers = ['Cliente', 'Teléfono', 'Plataforma', 'Correo', 'Contraseña', 'PIN', 'Fecha Adquisición', 'Estado', 'Notas', 'Nombre Cuenta', 'Precio Acordado'];
   const rows = subs.map(s => [
-    s.clientName, s.platform, s.accountEmail, s.accountPassword,
+    s.clientName, s.clientPhone || '', s.platform, s.accountEmail, s.accountPassword,
     s.profilePin, s.purchaseDate, s.paymentStatus, s.notes, s.accountName || '', s.salePriceOverride ? String(s.salePriceOverride) : ''
   ]);
   const csv = [headers, ...rows].map(r => r.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -60,10 +61,79 @@ export default function Index() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const dynamicPlatforms = loadPricing().map(p => p.platform);
 
   useEffect(() => { saveSubs(subs); }, [subs]);
+
+  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const lines = text.split('\n');
+        if (lines.length < 2) return toast.error("El archivo está vacío o es inválido");
+        
+        const newSubs: Subscription[] = [];
+        let skipped = 0;
+        
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          
+          const fields: string[] = [];
+          let cur = '', inQuotes = false;
+          
+          for (let j = 0; j < line.length; j++) {
+            if (line[j] === '"') inQuotes = !inQuotes;
+            else if (line[j] === ',' && !inQuotes) { fields.push(cur); cur = ''; }
+            else cur += line[j];
+          }
+          fields.push(cur);
+          
+          const clientName = fields[0]?.trim() || '';
+          const phone = fields[1]?.trim() || '';
+          const platform = fields[2]?.trim() || 'Otro';
+          if (!clientName) continue;
+          
+          const isDuplicate = subs.some(s => s.clientName.toLowerCase() === clientName.toLowerCase() && s.platform === platform);
+          if (isDuplicate) { skipped++; continue; }
+          
+          newSubs.push({
+            id: crypto.randomUUID(),
+            clientName,
+            clientPhone: phone,
+            platform,
+            accountEmail: fields[3]?.trim() || '',
+            accountPassword: fields[4]?.trim() || '',
+            profilePin: fields[5]?.trim() || '',
+            purchaseDate: fields[6]?.trim() || new Date().toISOString().split('T')[0],
+            paymentStatus: (fields[7]?.trim().toLowerCase() as PaymentStatus) || 'debe',
+            notes: fields[8]?.trim() || '',
+            accountName: fields[9]?.trim() || '',
+            salePriceOverride: fields[10] ? Number(fields[10]) : undefined
+          });
+        }
+        
+        if (newSubs.length > 0) {
+          setSubs(prev => [...newSubs, ...prev]);
+          toast.success(`Se importaron ${newSubs.length} clientes correctamente`);
+        } else if (skipped > 0) {
+          toast.info(`Se omitieron ${skipped} clientes repetidos.`);
+        } else {
+          toast.error("No se encontraron datos válidos.");
+        }
+      } catch (err) {
+        toast.error("Error al procesar el archivo CSV");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
 
   const handleSave = (sub: Subscription) => {
     setSubs(prev => {
@@ -162,6 +232,10 @@ export default function Index() {
 
             {activeTab === 'clients' && (
               <>
+                <input type="file" accept=".csv" ref={fileInputRef} className="hidden" onChange={handleImportCSV} />
+                <Button variant="outline" size="sm" className="hidden sm:flex gap-1.5 px-3 text-xs" onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="h-3.5 w-3.5" /> <span className="hidden lg:inline">Importar</span>
+                </Button>
                 <Button variant="outline" size="sm" className="flex gap-1.5 px-2 sm:px-3 text-xs" onClick={() => exportCSV(subs)}>
                   <Download className="h-4 w-4 sm:h-3.5 sm:w-3.5" /> <span className="hidden sm:inline">Excel/CSV</span>
                 </Button>

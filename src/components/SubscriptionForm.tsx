@@ -29,6 +29,7 @@ export default function SubscriptionForm({ open, onClose, onSave, initial }: Pro
     accountEmail: '',
     accountPassword: '',
     clientName: '',
+    clientPhone: '',
     purchaseDate: new Date().toISOString().split('T')[0],
     profilePin: '',
     paymentStatus: 'debe',
@@ -142,6 +143,11 @@ export default function SubscriptionForm({ open, onClose, onSave, initial }: Pro
               <Label className="text-xs font-semibold">Contraseña</Label>
               <Input value={form.accountPassword} onChange={e => set('accountPassword', e.target.value)} placeholder="Contraseña" />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold">Teléfono / WhatsApp (opcional)</Label>
+            <Input type="tel" value={form.clientPhone || ''} onChange={e => set('clientPhone', e.target.value)} placeholder="+57 300 000 0000" />
           </div>
 
           <div className="grid grid-cols-3 gap-3">
