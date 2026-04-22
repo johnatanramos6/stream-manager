@@ -10,7 +10,29 @@ interface Props {
   subscriptions: Subscription[];
 }
 
-const CHART_COLORS = ['#4f46e5', '#06b6d4', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#64748b', '#84cc16'];
+const getPlatformBrandColor = (name: string) => {
+  const n = name.toLowerCase();
+  if (n.includes('netflix')) return '#E50914';
+  if (n.includes('disney')) return '#040b3c'; // Disney dark blue
+  if (n.includes('amazon') || n.includes('prime')) return '#00A8E1';
+  if (n.includes('hbo') || n.includes('max')) return '#991EEB';
+  if (n.includes('star')) return '#F97316'; // Star+ orange/red
+  if (n.includes('crunchyroll')) return '#F47521';
+  if (n.includes('claro')) return '#DC2626';
+  if (n.includes('hulu')) return '#1CE783';
+  if (n.includes('apple')) return '#111827';
+  if (n.includes('spotify')) return '#1DB954';
+  if (n.includes('paramount')) return '#0064FF';
+  if (n.includes('iptv')) return '#10B981'; // Generic IPTV green
+  if (n.includes('youtube')) return '#FF0000';
+  if (n.includes('vix')) return '#f91d58';
+  
+  // Fallback map
+  let hash = 0;
+  for (let i = 0; i < n.length; i++) hash = n.charCodeAt(i) + ((hash << 5) - hash);
+  const fallbacks = ['#4f46e5', '#06b6d4', '#8b5cf6', '#84cc16', '#f59e0b', '#ec4899', '#64748b'];
+  return fallbacks[Math.abs(hash) % fallbacks.length];
+};
 
 export default function FinanceSection({ subscriptions }: Props) {
   const [pricing, setPricing] = useState<PlatformPricing[]>(loadPricing);
@@ -143,23 +165,28 @@ export default function FinanceSection({ subscriptions }: Props) {
 
       {/* Chart */}
       {chartData.length > 0 && (
-        <div className="bg-card rounded-xl border overflow-hidden animate-fade-in-up">
-          <div className="p-4 border-b">
-            <h3 className="font-semibold">Ganancia por plataforma</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Comparación visual de ganancias</p>
+        <div className="bg-card rounded-xl border overflow-hidden animate-fade-in-up shadow-sm">
+          <div className="p-4 border-b flex justify-between items-center bg-muted/10">
+            <div>
+              <h3 className="font-semibold text-sm sm:text-base">Análisis de Rentabilidad</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Ingresos divididos en Costo base (Abajo) y Ganancia Neta (Arriba)</p>
+            </div>
           </div>
-          <div className="p-4">
+          <div className="p-4 pt-6">
             <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={chartData} barCategoryGap="20%">
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
+              <BarChart data={chartData} barCategoryGap="25%" margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
                 <Tooltip
-                  formatter={(value: number) => formatCOP(value)}
-                  contentStyle={{ borderRadius: '12px', border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', fontSize: '12px' }}
+                  cursor={{ fill: 'hsl(var(--muted)/0.4)' }}
+                  formatter={(value: number, name: string) => [formatCOP(value), name === 'Ganancia' ? '💰 Ganancia Neta' : '📉 Costos (Inversión)']}
+                  contentStyle={{ borderRadius: '12px', border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', fontSize: '13px', padding: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  itemStyle={{ fontWeight: 600, padding: '2px 0' }}
                 />
-                <Bar dataKey="Ganancia" radius={[6, 6, 0, 0]}>
-                  {chartData.map((_, i) => (
-                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                <Bar dataKey="Costo" stackId="a" fill="hsl(var(--destructive)/0.25)" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="Ganancia" stackId="a" radius={[6, 6, 0, 0]}>
+                  {chartData.map((entry, i) => (
+                    <Cell key={i} fill={getPlatformBrandColor(entry.name)} />
                   ))}
                 </Bar>
               </BarChart>
