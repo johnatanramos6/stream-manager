@@ -171,18 +171,16 @@ export default function SubscriptionForm({ open, onClose, onSave, initial }: Pro
             <Input value={form.accountName || ''} onChange={e => set('accountName', e.target.value)} placeholder="Ej: Cuenta Netflix principal" />
           </div>
 
-          {form.platform === 'IPTV Premium' && (
-            <div className="space-y-1.5 p-3 bg-primary/5 rounded-xl border border-primary/20">
-              <Label className="text-xs font-semibold text-primary">Precio de venta acordado (opcional)</Label>
-              <Input 
-                type="number" 
-                value={form.salePriceOverride || ''} 
-                onChange={e => set('salePriceOverride', e.target.value === '' ? '' : Number(e.target.value) as any)} 
-                placeholder="Ej: 29000 para combo de 3 pantallas" 
-              />
-              <p className="text-[10px] text-muted-foreground mt-1">Si dejas esto en blanco, se usará el precio por defecto de la plataforma.</p>
-            </div>
-          )}
+          <div className="space-y-1.5 p-3 bg-primary/5 rounded-xl border border-primary/20">
+            <Label className="text-xs font-semibold text-primary">Precio de venta acordado (opcional)</Label>
+            <Input 
+              type="number" 
+              value={form.salePriceOverride || ''} 
+              onChange={e => set('salePriceOverride', e.target.value === '' ? '' : Number(e.target.value) as any)} 
+              placeholder="Ej: Precio especial o dejalo en blanco para usar el costo base" 
+            />
+            <p className="text-[10px] text-muted-foreground mt-1">Si dejas esto en blanco, se usará el precio por defecto de la configuración general.</p>
+          </div>
 
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold">Notas / Anotación</Label>
