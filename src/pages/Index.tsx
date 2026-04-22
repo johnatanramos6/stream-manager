@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Plus, Search, Tv, DollarSign, Download, Upload, Filter, X } from 'lucide-react';
 import { useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { seedData } from '@/data/seedData';
 
@@ -67,72 +68,87 @@ export default function Index() {
 
   useEffect(() => { saveSubs(subs); }, [subs]);
 
-  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const text = event.target?.result as string;
+    try {
+      let rows: string[][] = [];
+      const isExcel = file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls');
+      
+      if (isExcel) {
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const rawData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        if (rawData.length > 1) {
+          rows = rawData.slice(1).map(r => r.map(c => c === null || c === undefined ? '' : String(c)));
+        } else {
+          rows = [];
+        }
+      } else {
+        const text = await file.text();
         const lines = text.split('\n');
-        if (lines.length < 2) return toast.error("El archivo está vacío o es inválido");
-        
-        const newSubs: Subscription[] = [];
-        let skipped = 0;
-        
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i].trim();
           if (!line) continue;
           
           const fields: string[] = [];
           let cur = '', inQuotes = false;
-          
           for (let j = 0; j < line.length; j++) {
             if (line[j] === '"') inQuotes = !inQuotes;
             else if (line[j] === ',' && !inQuotes) { fields.push(cur); cur = ''; }
             else cur += line[j];
           }
           fields.push(cur);
-          
-          const clientName = fields[0]?.trim() || '';
-          const phone = fields[1]?.trim() || '';
-          const platform = fields[2]?.trim() || 'Otro';
-          if (!clientName) continue;
-          
-          const isDuplicate = subs.some(s => s.clientName.toLowerCase() === clientName.toLowerCase() && s.platform === platform);
-          if (isDuplicate) { skipped++; continue; }
-          
-          newSubs.push({
-            id: crypto.randomUUID(),
-            clientName,
-            clientPhone: phone,
-            platform,
-            accountEmail: fields[3]?.trim() || '',
-            accountPassword: fields[4]?.trim() || '',
-            profilePin: fields[5]?.trim() || '',
-            purchaseDate: fields[6]?.trim() || new Date().toISOString().split('T')[0],
-            paymentStatus: (fields[7]?.trim().toLowerCase() as PaymentStatus) || 'debe',
-            notes: fields[8]?.trim() || '',
-            accountName: fields[9]?.trim() || '',
-            salePriceOverride: fields[10] ? Number(fields[10]) : undefined
-          });
+          rows.push(fields);
         }
-        
-        if (newSubs.length > 0) {
-          setSubs(prev => [...newSubs, ...prev]);
-          toast.success(`Se importaron ${newSubs.length} clientes correctamente`);
-        } else if (skipped > 0) {
-          toast.info(`Se omitieron ${skipped} clientes repetidos.`);
-        } else {
-          toast.error("No se encontraron datos válidos.");
-        }
-      } catch (err) {
-        toast.error("Error al procesar el archivo CSV");
       }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
+
+      if (rows.length === 0) return toast.error("El archivo está vacío o no tiene clientes válidos");
+      
+      const newSubs: Subscription[] = [];
+      let skipped = 0;
+      
+      for (const fields of rows) {
+        const clientName = (fields[0] || '').trim();
+        const phone = (fields[1] || '').trim();
+        const platform = (fields[2] || '').trim() || 'Otro';
+        if (!clientName) continue;
+        
+        const isDuplicate = subs.some(s => s.clientName.toLowerCase() === clientName.toLowerCase() && s.platform === platform);
+        if (isDuplicate) { skipped++; continue; }
+        
+        newSubs.push({
+          id: crypto.randomUUID(),
+          clientName,
+          clientPhone: phone,
+          platform,
+          accountEmail: (fields[3] || '').trim(),
+          accountPassword: (fields[4] || '').trim(),
+          profilePin: (fields[5] || '').trim(),
+          purchaseDate: (fields[6] || '').trim() || new Date().toISOString().split('T')[0],
+          paymentStatus: ((fields[7] || '').trim().toLowerCase() as PaymentStatus) || 'debe',
+          notes: (fields[8] || '').trim(),
+          accountName: (fields[9] || '').trim(),
+          salePriceOverride: fields[10] ? Number(fields[10]) : undefined
+        });
+      }
+      
+      if (newSubs.length > 0) {
+        setSubs(prev => [...newSubs, ...prev]);
+        toast.success(`Se importaron ${newSubs.length} clientes correctamente`);
+      } else if (skipped > 0) {
+        toast.info(`Se omitieron ${skipped} clientes repetidos.`);
+      } else {
+        toast.error("No se encontraron datos válidos.");
+      }
+    } catch (err) {
+      toast.error("Error al procesar el archivo. Si es Excel asegúrate que el formato sea básico y sin modificaciones complejas o cambia a CSV.");
+    } finally {
+      e.target.value = '';
+    }
   };
 
   const handleSave = (sub: Subscription) => {
@@ -232,8 +248,8 @@ export default function Index() {
 
             {activeTab === 'clients' && (
               <>
-                <input type="file" accept=".csv" ref={fileInputRef} className="hidden" onChange={handleImportCSV} />
-                <Button variant="outline" size="sm" className="flex gap-1.5 px-2 sm:px-3 text-xs" onClick={() => fileInputRef.current?.click()} title="Importar">
+                <input type="file" accept=".csv,.xlsx,.xls" ref={fileInputRef} className="hidden" onChange={handleImportFile} />
+                <Button variant="outline" size="sm" className="flex gap-1.5 px-2 sm:px-3 text-xs" onClick={() => fileInputRef.current?.click()} title="Importar Excel/CSV">
                   <Upload className="h-4 w-4 sm:h-3.5 sm:w-3.5" /> <span className="hidden lg:inline">Importar</span>
                 </Button>
                 <Button variant="outline" size="sm" className="flex gap-1.5 px-2 sm:px-3 text-xs" onClick={() => exportCSV(subs)}>
