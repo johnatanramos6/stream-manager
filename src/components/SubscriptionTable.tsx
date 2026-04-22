@@ -1,7 +1,7 @@
 import { Subscription, getPlatformClass, getRowStatus, getDaysUntilPayment, getNextPaymentDate } from '@/types/subscription';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Pencil, Trash2, Eye, EyeOff, Copy, Check, ArrowUpDown } from 'lucide-react';
+import { Pencil, Trash2, Eye, EyeOff, Copy, Check, ArrowUpDown, MessageCircle } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -34,6 +34,16 @@ export default function SubscriptionTable({ subscriptions, onEdit, onDelete, onT
     } catch {
       toast.error('No se pudo copiar');
     }
+  };
+
+  const sendWhatsAppReminder = (sub: Subscription) => {
+    if (!sub.clientPhone) return toast.error("Este cliente no tiene un teléfono registrado.");
+    const phone = sub.clientPhone.replace(/\D/g, '');
+    if (!phone) return toast.error("El número de teléfono no es válido.");
+    
+    const message = `¡Hola ${sub.clientName}! 👋 Te saludamos de Stream Manager.\n\nQueríamos recordarte amablemente que tu suscripción de ${sub.platform} está próxima a vencer (o ya venció). ¡No pierdas el acceso a tus perfiles, escríbenos para renovarla!`;
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
   };
 
   const handleSort = (key: SortKey) => {
@@ -155,6 +165,16 @@ export default function SubscriptionTable({ subscriptions, onEdit, onDelete, onT
                   <td className="p-3 text-xs text-muted-foreground max-w-[120px] truncate">{sub.notes || '—'}</td>
                   <td className="p-3 text-right">
                     <div className="flex gap-1 justify-end">
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className={`h-7 w-7 ${sub.clientPhone ? 'text-green-600 hover:bg-green-600/10 hover:text-green-700' : 'text-muted-foreground/30'}`}
+                        onClick={() => sub.clientPhone && sendWhatsAppReminder(sub)}
+                        disabled={!sub.clientPhone}
+                        title="Enviar recordatorio por WhatsApp"
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                      </Button>
                       <Button size="icon" variant="ghost" className="h-7 w-7 hover:bg-primary/10 hover:text-primary" onClick={() => onEdit(sub)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
@@ -200,6 +220,15 @@ export default function SubscriptionTable({ subscriptions, onEdit, onDelete, onT
                   </button>
                 </div>
                 <div className="flex gap-1">
+                  <Button 
+                    size="icon" 
+                    variant="ghost" 
+                    className={`h-8 w-8 ${sub.clientPhone ? 'text-green-600 hover:bg-green-600/10 hover:text-green-700' : 'text-muted-foreground/30'}`} 
+                    onClick={() => sub.clientPhone && sendWhatsAppReminder(sub)}
+                    disabled={!sub.clientPhone}
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" />
+                  </Button>
                   <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-primary/10 hover:text-primary" onClick={() => onEdit(sub)}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
