@@ -32,10 +32,10 @@ function saveSubs(subs: Subscription[]) {
 }
 
 function exportCSV(subs: Subscription[]) {
-  const headers = ['Cliente', 'Plataforma', 'Correo', 'Contraseña', 'PIN', 'Fecha', 'Estado', 'Notas', 'Nombre Cuenta'];
+  const headers = ['Cliente', 'Plataforma', 'Correo', 'Contraseña', 'PIN', 'Fecha Adquisición', 'Estado', 'Notas', 'Nombre Cuenta', 'Precio Acordado'];
   const rows = subs.map(s => [
     s.clientName, s.platform, s.accountEmail, s.accountPassword,
-    s.profilePin, s.purchaseDate, s.paymentStatus, s.notes, s.accountName || ''
+    s.profilePin, s.purchaseDate, s.paymentStatus, s.notes, s.accountName || '', s.salePriceOverride ? String(s.salePriceOverride) : ''
   ]);
   const csv = [headers, ...rows].map(r => r.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -159,8 +159,8 @@ export default function Index() {
 
             {activeTab === 'clients' && (
               <>
-                <Button variant="outline" size="sm" className="hidden sm:flex gap-1.5 text-xs" onClick={() => exportCSV(subs)}>
-                  <Download className="h-3.5 w-3.5" /> CSV
+                <Button variant="outline" size="sm" className="flex gap-1.5 px-2 sm:px-3 text-xs" onClick={() => exportCSV(subs)}>
+                  <Download className="h-4 w-4 sm:h-3.5 sm:w-3.5" /> <span className="hidden sm:inline">Excel/CSV</span>
                 </Button>
                 <Button onClick={() => { setEditing(null); setFormOpen(true); }} className="gap-1.5 text-xs hidden sm:flex shadow-lg shadow-primary/20">
                   <Plus className="h-4 w-4" /> Agregar
