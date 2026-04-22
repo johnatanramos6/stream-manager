@@ -3,7 +3,7 @@ import { Subscription } from '@/types/subscription';
 import { PlatformPricing, loadPricing, savePricing, formatCOP } from '@/types/platformPricing';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { DollarSign, TrendingUp, Users, Monitor, Save, AlertCircle } from 'lucide-react';
+import { DollarSign, TrendingUp, Users, Monitor, Save, AlertCircle, Plus, X } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface Props {
@@ -16,8 +16,16 @@ export default function FinanceSection({ subscriptions }: Props) {
   const [pricing, setPricing] = useState<PlatformPricing[]>(loadPricing);
   const [editing, setEditing] = useState(false);
 
-  const handlePricingChange = (index: number, field: 'costPrice' | 'salePrice', value: string) => {
-    setPricing(prev => prev.map((p, i) => i === index ? { ...p, [field]: Number(value) || 0 } : p));
+  const handlePricingChange = (index: number, field: keyof PlatformPricing, value: string | number) => {
+    setPricing(prev => prev.map((p, i) => i === index ? { ...p, [field]: value } : p));
+  };
+
+  const handleAddPlatform = () => {
+    setPricing(prev => [...prev, { platform: '', costType: 'per_screen', costPrice: 0, salePrice: 0 }]);
+  };
+
+  const handleRemovePlatform = (index: number) => {
+    setPricing(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSavePricing = () => {
@@ -216,9 +224,14 @@ export default function FinanceSection({ subscriptions }: Props) {
             <p className="text-xs text-muted-foreground mt-0.5">Configura tus costos y precios de venta</p>
           </div>
           {editing ? (
-            <Button size="sm" onClick={handleSavePricing} className="gap-1.5 shadow-lg shadow-primary/20">
-              <Save className="h-3.5 w-3.5" /> Guardar
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={handleAddPlatform} className="gap-1.5 border-dashed">
+                <Plus className="h-3.5 w-3.5" /> Agregar Plataforma
+              </Button>
+              <Button size="sm" onClick={handleSavePricing} className="gap-1.5 shadow-lg shadow-primary/20">
+                <Save className="h-3.5 w-3.5" /> Guardar
+              </Button>
+            </div>
           ) : (
             <Button size="sm" variant="outline" onClick={() => setEditing(true)}>Editar precios</Button>
           )}
@@ -234,16 +247,25 @@ export default function FinanceSection({ subscriptions }: Props) {
             </thead>
             <tbody>
               {pricing.map((p, i) => (
-                <tr key={p.platform} className="border-t transition-colors hover:bg-muted/30">
-                  <td className="p-3 font-medium">{p.platform}</td>
+                <tr key={i} className="border-t transition-colors hover:bg-muted/30">
+                  <td className="p-3 font-medium">
+                    {editing ? (
+                      <Input value={p.platform} onChange={e => handlePricingChange(i, 'platform', e.target.value)} placeholder="Nombre plataforma" className="w-full min-w-[140px]" />
+                    ) : p.platform}
+                  </td>
                   <td className="p-3 text-right">
                     {editing ? (
-                      <Input type="number" value={p.costPrice} onChange={e => handlePricingChange(i, 'costPrice', e.target.value)} className="w-28 ml-auto text-right" />
+                      <Input type="number" value={p.costPrice || ''} onChange={e => handlePricingChange(i, 'costPrice', e.target.value === '' ? 0 : Number(e.target.value))} className="w-28 ml-auto text-right" placeholder="0" />
                     ) : formatCOP(p.costPrice)}
                   </td>
                   <td className="p-3 text-right">
                     {editing ? (
-                      <Input type="number" value={p.salePrice} onChange={e => handlePricingChange(i, 'salePrice', e.target.value)} className="w-28 ml-auto text-right" />
+                      <div className="flex items-center gap-2 justify-end">
+                        <Input type="number" value={p.salePrice || ''} onChange={e => handlePricingChange(i, 'salePrice', e.target.value === '' ? 0 : Number(e.target.value))} className="w-28 text-right" placeholder="0" />
+                        <button type="button" onClick={() => handleRemovePlatform(i)} className="text-muted-foreground hover:text-destructive p-1 rounded transition-colors" title="Eliminar plataforma">
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
                     ) : formatCOP(p.salePrice)}
                   </td>
                 </tr>

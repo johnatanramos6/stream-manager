@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Subscription, PLATFORMS, Platform, PaymentStatus } from '@/types/subscription';
+import { Subscription, Platform, PaymentStatus } from '@/types/subscription';
+import { loadPricing } from '@/types/platformPricing';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,6 +39,10 @@ export default function SubscriptionForm({ open, onClose, onSave, initial }: Pro
   const [form, setForm] = useState<Omit<Subscription, 'id'>>(
     initial ? { ...initial } : empty
   );
+
+  const dynamicPlatforms = useMemo(() => {
+    return loadPricing().map(p => p.platform);
+  }, [open]);
 
   const existingAccounts = useMemo(() => {
     const subs = loadExistingAccounts();
@@ -105,7 +110,7 @@ export default function SubscriptionForm({ open, onClose, onSave, initial }: Pro
               <Select value={form.platform} onValueChange={v => set('platform', v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {PLATFORMS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  {dynamicPlatforms.map((p, i) => <SelectItem key={i} value={p}>{p}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

@@ -1,13 +1,4 @@
-export type Platform = 
-  | 'Netflix'
-  | 'Amazon Prime Video'
-  | 'Disney Premium'
-  | 'HBO Max'
-  | 'IPTV Premium'
-  | 'Star Plus'
-  | 'Crunchyroll'
-  | 'Claro Video'
-  | 'Otro';
+export type Platform = string;
 
 export type PaymentStatus = 'pagado' | 'debe' | 'cobrar';
 
@@ -25,17 +16,7 @@ export interface Subscription {
   salePriceOverride?: number; // Precio de cobro específico acordado (IPTV combos)
 }
 
-export const PLATFORMS: Platform[] = [
-  'Netflix',
-  'Amazon Prime Video',
-  'Disney Premium',
-  'HBO Max',
-  'IPTV Premium',
-  'Star Plus',
-  'Crunchyroll',
-  'Claro Video',
-  'Otro',
-];
+// Array removido ya que ahora se obtiene dinámicamente de Pricing.
 
 export function getPlatformClass(platform: Platform): string {
   const map: Record<string, string> = {

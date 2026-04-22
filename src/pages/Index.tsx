@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Subscription, Platform, PaymentStatus, PLATFORMS, getDaysUntilPayment } from '@/types/subscription';
+import { Subscription, Platform, PaymentStatus, getDaysUntilPayment } from '@/types/subscription';
+import { loadPricing } from '@/types/platformPricing';
 import SubscriptionForm from '@/components/SubscriptionForm';
 import SubscriptionTable from '@/components/SubscriptionTable';
 import StatsBar, { QuickFilter } from '@/components/StatsBar';
@@ -59,6 +60,8 @@ export default function Index() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
+
+  const dynamicPlatforms = loadPricing().map(p => p.platform);
 
   useEffect(() => { saveSubs(subs); }, [subs]);
 
@@ -186,7 +189,7 @@ export default function Index() {
                 <SelectTrigger className="w-[180px]"><SelectValue placeholder="Plataforma" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas</SelectItem>
-                  {PLATFORMS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  {dynamicPlatforms.map((p, i) => <SelectItem key={i} value={p}>{p}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={filterStatus} onValueChange={v => { setFilterStatus(v); setQuickFilter('all'); }}>
@@ -223,7 +226,7 @@ export default function Index() {
                     <SelectTrigger className="flex-1 h-9 text-xs"><SelectValue placeholder="Plataforma" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todas</SelectItem>
-                      {PLATFORMS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                      {dynamicPlatforms.map((p, i) => <SelectItem key={i} value={p}>{p}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   <Select value={filterStatus} onValueChange={v => { setFilterStatus(v); setQuickFilter('all'); }}>
