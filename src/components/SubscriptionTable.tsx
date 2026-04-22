@@ -116,7 +116,7 @@ export default function SubscriptionTable({ subscriptions, onEdit, onDelete, onT
                   style={{ animationDelay: `${i * 30}ms` }}
                 >
                   <td className="p-3">
-                    <Badge className={`${getPlatformClass(sub.platform)} border-0 text-xs font-semibold shadow-sm`}>
+                    <Badge className={`${getPlatformClass(sub.platform)} border-0 text-xs font-semibold shadow-sm max-w-[120px] truncate block w-fit`}>
                       {sub.platform}
                     </Badge>
                   </td>
@@ -191,11 +191,11 @@ export default function SubscriptionTable({ subscriptions, onEdit, onDelete, onT
             >
               {/* Top row: platform + status + actions */}
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Badge className={`${getPlatformClass(sub.platform)} border-0 text-xs font-semibold shadow-sm`}>
+                <div className="flex items-center gap-2 flex-1 min-w-0 pr-2">
+                  <Badge className={`${getPlatformClass(sub.platform)} border-0 text-xs font-semibold shadow-sm max-w-[120px] truncate block`}>
                     {sub.platform}
                   </Badge>
-                  <button onClick={() => onTogglePayment(sub.id)} className="transition-transform active:scale-95">
+                  <button onClick={() => onTogglePayment(sub.id)} className="transition-transform active:scale-95 shrink-0">
                     {statusBadge(sub.paymentStatus)}
                   </button>
                 </div>
