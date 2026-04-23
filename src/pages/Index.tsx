@@ -160,6 +160,20 @@ function IndexContent() {
         const phone = safeGet(fields, idxPhone, 1);
         const platform = safeGet(fields, idxPlatform, 2) || 'Otro';
         if (!clientName) continue;
+
+        // Filtro inteligente: descartar filas que NO son clientes reales
+        const nameLower = clientName.toLowerCase();
+        const isLabel = /^\*.*\*:?$/.test(clientName.trim()) || nameLower.endsWith(':');
+        const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientName.trim());
+        const isDescription = clientName.length > 40 && clientName === clientName.toUpperCase();
+        const isPassword = !clientName.includes(' ') && /[#@$%&!]/.test(clientName) && clientName.length < 20;
+        const isGarbage = isLabel || isEmail || isDescription || isPassword;
+
+        // Si todas las demás columnas están vacías, probablemente no es un cliente real
+        const otherCols = [safeGet(fields, idxPlatform, 2), safeGet(fields, idxEmail, 3), safeGet(fields, idxDate, 6)];
+        const allOtherEmpty = otherCols.every(c => !c);
+        
+        if (isGarbage || (platform === 'Otro' && allOtherEmpty)) continue;
         
         const isDuplicate = subs.some(s => s.clientName.toLowerCase() === clientName.toLowerCase() && s.platform === platform);
         if (isDuplicate) { skipped++; continue; }
