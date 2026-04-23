@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Plus, Search, Tv, DollarSign, Download, Upload, Filter, X } from 'lucide-react';
+import { Plus, Search, Tv, DollarSign, Download, Upload, Filter, X, LogOut } from 'lucide-react';
 import { useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
@@ -41,7 +41,7 @@ function exportCSV(subs: Subscription[]) {
 }
 
 function IndexContent() {
-  const { session, user, isAdmin } = useAuth();
+  const { session, user, isAdmin, signOut } = useAuth();
   const [subs, setSubs] = useState<Subscription[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Subscription | null>(null);
@@ -356,6 +356,10 @@ function IndexContent() {
             </div>
 
             <ThemeToggle />
+
+            <Button variant="ghost" size="icon" onClick={signOut} className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10" title="Cerrar sesión">
+              <LogOut className="h-4 w-4" />
+            </Button>
 
             {activeTab === 'clients' && (
               <>
