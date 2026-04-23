@@ -103,7 +103,7 @@ function IndexContent() {
         }
       } else {
         const text = await file.text();
-        const lines = text.split('\n');
+        const lines = text.split(/\r\n|\n|\r/);
         if (lines.length > 0) {
           const hLine = lines[0].trim();
           let cur = '', inQuotes = false;
