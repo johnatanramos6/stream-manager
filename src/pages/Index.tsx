@@ -15,24 +15,13 @@ import { Plus, Search, Tv, DollarSign, Download, Upload, Filter, X } from 'lucid
 import { useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
-import { seedData } from '@/data/seedData';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import Login from '@/components/Login';
+import AdminPanel from '@/components/AdminPanel';
 
-const STORAGE_KEY = 'streaming-subscriptions';
-
-function loadSubs(): Subscription[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const version = localStorage.getItem(STORAGE_KEY + '-version');
-    if (raw && version === '2026-v2') return JSON.parse(raw);
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.setItem(STORAGE_KEY + '-version', '2026-v2');
-    return [...seedData];
-  } catch { return []; }
-}
-
-function saveSubs(subs: Subscription[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(subs));
-}
+// Deprecated local storage methods removed.
+// We keep exportCSV standard since it's pure logic.
 
 function exportCSV(subs: Subscription[]) {
   const headers = ['Cliente', 'Teléfono', 'Plataforma', 'Correo', 'Contraseña', 'PIN', 'Fecha Adquisición', 'Estado', 'Notas', 'Nombre Cuenta', 'Precio Acordado'];
@@ -51,8 +40,9 @@ function exportCSV(subs: Subscription[]) {
   toast.success('Archivo CSV descargado');
 }
 
-export default function Index() {
-  const [subs, setSubs] = useState<Subscription[]>(loadSubs);
+function IndexContent() {
+  const { session, user, isAdmin } = useAuth();
+  const [subs, setSubs] = useState<Subscription[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Subscription | null>(null);
   const [search, setSearch] = useState('');
@@ -62,11 +52,35 @@ export default function Index() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
+  const [showAdmin, setShowAdmin] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const dynamicPlatforms = loadPricing().map(p => p.platform);
 
-  useEffect(() => { saveSubs(subs); }, [subs]);
+  useEffect(() => {
+    if (!user) return;
+    const fetchDb = async () => {
+      const { data, error } = await supabase.from('subscriptions').select().eq('vendor_id', user.id);
+      if (data) {
+        setSubs(data.map(d => ({
+          id: d.id,
+          clientName: d.client_name,
+          clientPhone: d.client_phone,
+          platform: d.platform,
+          accountEmail: d.account_email,
+          accountPassword: d.account_password,
+          profilePin: d.profile_pin,
+          purchaseDate: d.purchase_date,
+          paymentStatus: d.payment_status,
+          notes: d.notes,
+          accountName: d.account_name,
+          salePriceOverride: d.sale_price_override
+        })));
+      }
+      if (error) toast.error("Error al cargar la base de datos.");
+    };
+    fetchDb();
+  }, [user]);
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -151,7 +165,26 @@ export default function Index() {
     }
   };
 
-  const handleSave = (sub: Subscription) => {
+  const handleSave = async (sub: Subscription) => {
+    const payload = {
+      id: sub.id,
+      vendor_id: user!.id,
+      client_name: sub.clientName,
+      client_phone: sub.clientPhone,
+      platform: sub.platform,
+      account_email: sub.accountEmail,
+      account_password: sub.accountPassword,
+      profile_pin: sub.profilePin,
+      purchase_date: sub.purchaseDate,
+      payment_status: sub.paymentStatus,
+      notes: sub.notes,
+      account_name: sub.accountName,
+      sale_price_override: sub.salePriceOverride
+    };
+
+    const { error } = await supabase.from('subscriptions').upsert(payload);
+    if (error) return toast.error("Error al guardar en la nube");
+
     setSubs(prev => {
       const exists = prev.find(s => s.id === sub.id);
       if (exists) return prev.map(s => s.id === sub.id ? sub : s);
@@ -170,21 +203,23 @@ export default function Index() {
     setDeleteId(id);
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (deleteId) {
+      await supabase.from('subscriptions').delete().eq('id', deleteId);
       setSubs(prev => prev.filter(s => s.id !== deleteId));
-      toast.success('Suscripción eliminada');
+      toast.success('Suscripción eliminada de la nube');
       setDeleteId(null);
     }
   };
 
-  const handleTogglePayment = (id: string) => {
-    setSubs(prev => prev.map(s => {
-      if (s.id !== id) return s;
-      const cycle: PaymentStatus[] = ['debe', 'cobrar', 'pagado'];
-      const next = cycle[(cycle.indexOf(s.paymentStatus) + 1) % cycle.length];
-      return { ...s, paymentStatus: next };
-    }));
+  const handleTogglePayment = async (id: string) => {
+    const sub = subs.find(s => s.id === id);
+    if (!sub) return;
+    const cycle: PaymentStatus[] = ['debe', 'cobrar', 'pagado'];
+    const next = cycle[(cycle.indexOf(sub.paymentStatus) + 1) % cycle.length];
+    
+    await supabase.from('subscriptions').update({ payment_status: next }).eq('id', id);
+    setSubs(prev => prev.map(s => s.id === id ? { ...s, paymentStatus: next } : s));
   };
 
   const filtered = subs.filter(s => {
@@ -226,6 +261,7 @@ export default function Index() {
           </div>
 
           <div className="flex items-center gap-1.5">
+            {isAdmin && <Button variant="ghost" size="sm" onClick={() => setShowAdmin(true)} className="hidden sm:flex text-amber-500">Súper Admin</Button>}
             {/* Tab buttons */}
             <div className="flex bg-muted rounded-lg p-1">
               <button
@@ -387,4 +423,10 @@ export default function Index() {
       <InstallPWA />
     </div>
   );
+}
+
+export default function Index() {
+  const { session } = useAuth();
+  if (!session) return <Login />;
+  return <IndexContent />;
 }
