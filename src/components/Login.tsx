@@ -13,10 +13,22 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       toast.error('Correo o contraseña incorrectos');
     } else {
+      // Verificar si es admin (admin no necesita estar en vendors)
+      const isAdmin = data.user?.email?.toLowerCase() === 'johnatanramos6@gmail.com';
+      if (!isAdmin) {
+        // Verificar si el vendedor está activo
+        const { data: vendorData } = await supabase.from('vendors').select('active').eq('email', data.user?.email?.toLowerCase()).single();
+        if (vendorData && !vendorData.active) {
+          await supabase.auth.signOut();
+          toast.error('Tu cuenta ha sido suspendida. Contacta al administrador.');
+          setLoading(false);
+          return;
+        }
+      }
       toast.success('¡Bienvenido a Stream Manager!');
     }
     setLoading(false);
