@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   };
 
-  const isAdmin = user?.email === 'johnatanramos6@gmail.com';
+  const isAdmin = user?.email?.toLowerCase() === 'johnatanramos6@gmail.com';
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center bg-background"><div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" /></div>;

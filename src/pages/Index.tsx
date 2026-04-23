@@ -261,7 +261,7 @@ function IndexContent() {
           </div>
 
           <div className="flex items-center gap-1.5">
-            {isAdmin && <Button variant="ghost" size="sm" onClick={() => setShowAdmin(true)} className="hidden sm:flex text-amber-500">Súper Admin</Button>}
+            {isAdmin && <Button variant="ghost" size="sm" onClick={() => setShowAdmin(true)} className="flex text-amber-500 font-bold px-2 sm:px-3">Súper Admin</Button>}
             {/* Tab buttons */}
             <div className="flex bg-muted rounded-lg p-1">
               <button
