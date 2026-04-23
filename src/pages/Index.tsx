@@ -88,6 +88,7 @@ function IndexContent() {
 
     try {
       let rows: string[][] = [];
+      let headers: string[] = [];
       const isExcel = file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls');
       
       if (isExcel) {
@@ -97,71 +98,129 @@ function IndexContent() {
         const worksheet = workbook.Sheets[sheetName];
         const rawData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
         if (rawData.length > 1) {
+          headers = rawData[0].map(String);
           rows = rawData.slice(1).map(r => r.map(c => c === null || c === undefined ? '' : String(c)));
-        } else {
-          rows = [];
         }
       } else {
         const text = await file.text();
         const lines = text.split('\n');
-        for (let i = 1; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (!line) continue;
-          
-          const fields: string[] = [];
+        if (lines.length > 0) {
+          const hLine = lines[0].trim();
           let cur = '', inQuotes = false;
-          for (let j = 0; j < line.length; j++) {
-            if (line[j] === '"') inQuotes = !inQuotes;
-            else if (line[j] === ',' && !inQuotes) { fields.push(cur); cur = ''; }
-            else cur += line[j];
+          for (let j = 0; j < hLine.length; j++) {
+            if (hLine[j] === '"') inQuotes = !inQuotes;
+            else if (hLine[j] === ',' && !inQuotes) { headers.push(cur.replace(/"/g, '').trim()); cur = ''; }
+            else cur += hLine[j];
           }
-          fields.push(cur);
-          rows.push(fields);
+          headers.push(cur.replace(/"/g, '').trim());
+
+          for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            const fields: string[] = [];
+            cur = ''; inQuotes = false;
+            for (let j = 0; j < line.length; j++) {
+              if (line[j] === '"') inQuotes = !inQuotes;
+              else if (line[j] === ',' && !inQuotes) { fields.push(cur); cur = ''; }
+              else cur += line[j];
+            }
+            fields.push(cur);
+            rows.push(fields);
+          }
         }
       }
 
       if (rows.length === 0) return toast.error("El archivo está vacío o no tiene clientes válidos");
       
+      const getIdx = (words: string[]) => headers.findIndex(h => words.some(w => h.toLowerCase().includes(w)));
+      const idxClient = getIdx(['cliente', 'nombre']);
+      const idxPhone = getIdx(['teléfono', 'telefono', 'celular']);
+      const idxPlatform = getIdx(['plataforma', 'servicio']);
+      const idxEmail = getIdx(['correo', 'email']);
+      const idxPass = getIdx(['contraseña', 'password', 'clave']);
+      const idxPin = getIdx(['pin', 'perfil']);
+      const idxDate = getIdx(['fecha', 'adquisición', 'adquisicion']);
+      const idxStatus = getIdx(['estado', 'pago']);
+      const idxNotes = getIdx(['nota', 'observaci']);
+      const idxAccName = getIdx(['cuenta', 'pantalla']);
+      const idxPrice = getIdx(['precio', 'acordado']);
+
+      const hasHeaders = idxClient !== -1 || idxPlatform !== -1 || idxEmail !== -1;
+
+      const safeGet = (fields: string[], idx: number, fallback: number) => {
+        if (hasHeaders) return idx !== -1 ? (fields[idx] || '').trim() : '';
+        return (fields[fallback] || '').trim();
+      };
+
       const newSubs: Subscription[] = [];
       let skipped = 0;
       
       for (const fields of rows) {
-        const clientName = (fields[0] || '').trim();
-        const phone = (fields[1] || '').trim();
-        const platform = (fields[2] || '').trim() || 'Otro';
+        const clientName = safeGet(fields, idxClient, 0);
+        const phone = safeGet(fields, idxPhone, 1);
+        const platform = safeGet(fields, idxPlatform, 2) || 'Otro';
         if (!clientName) continue;
         
         const isDuplicate = subs.some(s => s.clientName.toLowerCase() === clientName.toLowerCase() && s.platform === platform);
         if (isDuplicate) { skipped++; continue; }
         
+        const rawDate = safeGet(fields, idxDate, 6);
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        const finalDate = dateRegex.test(rawDate) ? rawDate : new Date().toISOString().split('T')[0];
+
+        const rawPrice = safeGet(fields, idxPrice, 10);
+
         newSubs.push({
           id: crypto.randomUUID(),
           clientName,
           clientPhone: phone,
           platform,
-          accountEmail: (fields[3] || '').trim(),
-          accountPassword: (fields[4] || '').trim(),
-          profilePin: (fields[5] || '').trim(),
-          purchaseDate: (fields[6] || '').trim() || new Date().toISOString().split('T')[0],
-          paymentStatus: ((fields[7] || '').trim().toLowerCase() as PaymentStatus) || 'debe',
-          notes: (fields[8] || '').trim(),
-          accountName: (fields[9] || '').trim(),
-          salePriceOverride: fields[10] ? Number(fields[10]) : undefined
+          accountEmail: safeGet(fields, idxEmail, 3),
+          accountPassword: safeGet(fields, idxPass, 4),
+          profilePin: safeGet(fields, idxPin, 5),
+          purchaseDate: finalDate,
+          paymentStatus: (safeGet(fields, idxStatus, 7).toLowerCase() as PaymentStatus) || 'debe',
+          notes: safeGet(fields, idxNotes, 8),
+          accountName: safeGet(fields, idxAccName, 9),
+          salePriceOverride: rawPrice && !isNaN(Number(rawPrice)) ? Number(rawPrice) : undefined
         });
       }
       
       if (newSubs.length > 0) {
+        const dbPayload = newSubs.map(s => ({
+          id: s.id,
+          vendor_id: user!.id,
+          client_name: s.clientName,
+          client_phone: s.clientPhone,
+          platform: s.platform,
+          account_email: s.accountEmail,
+          account_password: s.accountPassword,
+          profile_pin: s.profilePin,
+          purchase_date: s.purchaseDate,
+          payment_status: s.paymentStatus,
+          notes: s.notes,
+          account_name: s.accountName,
+          sale_price_override: s.salePriceOverride
+        }));
+
+        const { error } = await supabase.from('subscriptions').insert(dbPayload);
+        if (error) {
+          console.error(error);
+          return toast.error("Error al guardar en la nube. Verifica tu conexión.");
+        }
+
         setSubs(prev => [...newSubs, ...prev]);
-        toast.success(`Se importaron ${newSubs.length} clientes correctamente`);
+        toast.success(`Se importaron ${newSubs.length} clientes a la nube`);
       } else if (skipped > 0) {
         toast.info(`Se omitieron ${skipped} clientes repetidos.`);
       } else {
-        toast.error("No se encontraron datos válidos.");
+        toast.error("No se encontraron datos válidos nuevos.");
       }
     } catch (err) {
-      toast.error("Error al procesar el archivo. Si es Excel asegúrate que el formato sea básico y sin modificaciones complejas o cambia a CSV.");
+      console.error(err);
+      toast.error("Error al procesar el archivo. Si es Excel asegúrate que el formato sea básico.");
     } finally {
-      e.target.value = '';
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
