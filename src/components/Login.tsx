@@ -20,11 +20,12 @@ export default function Login() {
       // Verificar si es admin (admin no necesita estar en vendors)
       const isAdmin = data.user?.email?.toLowerCase() === 'johnatanramos6@gmail.com';
       if (!isAdmin) {
-        // Verificar si el vendedor está activo
-        const { data: vendorData } = await supabase.from('vendors').select('active').eq('email', data.user?.email?.toLowerCase()).single();
-        if (vendorData && !vendorData.active) {
+        // Verificar si el vendedor existe y está activo
+        const { data: vendorData, error: vendorError } = await supabase.from('vendors').select('active').eq('email', data.user?.email?.toLowerCase()).single();
+        
+        if (!vendorData || vendorError || !vendorData.active) {
           await supabase.auth.signOut();
-          toast.error('Tu cuenta ha sido suspendida. Contacta al administrador.');
+          toast.error(!vendorData || vendorError ? 'Tu cuenta ha sido eliminada. Contacta al administrador.' : 'Tu cuenta ha sido suspendida. Contacta al administrador.');
           setLoading(false);
           return;
         }
