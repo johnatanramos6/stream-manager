@@ -167,7 +167,8 @@ function IndexContent() {
         const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientName.trim());
         const isDescription = clientName.length > 40 && clientName === clientName.toUpperCase();
         const isPassword = !clientName.includes(' ') && /[#@$%&!]/.test(clientName) && clientName.length < 20;
-        const isGarbage = isLabel || isEmail || isDescription || isPassword;
+        const isSentence = clientName.split(/\s+/).length > 5;
+        const isGarbage = isLabel || isEmail || isDescription || isPassword || isSentence;
 
         // Si todas las demás columnas están vacías, probablemente no es un cliente real
         const otherCols = [safeGet(fields, idxPlatform, 2), safeGet(fields, idxEmail, 3), safeGet(fields, idxDate, 6)];
