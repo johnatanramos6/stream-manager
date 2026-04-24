@@ -132,15 +132,19 @@ export default function FinanceSection({ subscriptions }: Props) {
   }));
 
   // ── Datos mensuales para el gráfico de tendencia ──
+  const currentMonthIdx = new Date().getMonth();
+  const isCurrentYear = selectedYear === new Date().getFullYear();
+  const lastRealMonth = isCurrentYear ? currentMonthIdx : 11;
+
   const monthlyData = useMemo(() => {
     const pricingMap = new Map(pricing.map(p => [p.platform, p]));
-    const months: { month: string; monthFull: string; Ingresos: number; Costos: number; Ganancia: number; clients: number }[] = [];
+    const months: { month: string; monthFull: string; Ingresos: number | null; Costos: number | null; Ganancia: number | null; IngresosProj: number | null; CostosProj: number | null; GananciaProj: number | null; clients: number; isFuture: boolean }[] = [];
 
     for (let m = 0; m < 12; m++) {
+      const isFuture = isCurrentYear && m > currentMonthIdx;
+
       const subsInMonth = subscriptions.filter(sub => {
         const d = new Date(sub.purchaseDate + 'T12:00:00');
-        // Un cliente genera ingreso cada mes desde su fecha de compra
-        // Si compró antes o durante este mes del año seleccionado, cuenta
         const subStart = new Date(d.getFullYear(), d.getMonth(), 1);
         const targetMonth = new Date(selectedYear, m, 1);
         return subStart <= targetMonth;
@@ -173,18 +177,23 @@ export default function FinanceSection({ subscriptions }: Props) {
       months.push({
         month: MONTH_NAMES[m],
         monthFull: MONTH_FULL[m],
-        Ingresos: revenue,
-        Costos: cost,
-        Ganancia: revenue - cost,
-        clients: subsInMonth.length
+        Ingresos: !isFuture ? revenue : null,
+        Costos: !isFuture ? cost : null,
+        Ganancia: !isFuture ? revenue - cost : null,
+        IngresosProj: (m === lastRealMonth || isFuture) ? revenue : null,
+        CostosProj: (m === lastRealMonth || isFuture) ? cost : null,
+        GananciaProj: (m === lastRealMonth || isFuture) ? revenue - cost : null,
+        clients: subsInMonth.length,
+        isFuture
       });
     }
     return months;
-  }, [subscriptions, pricing, selectedYear]);
+  }, [subscriptions, pricing, selectedYear, currentMonthIdx, isCurrentYear, lastRealMonth]);
 
-  const currentMonthIdx = new Date().getMonth();
-  const annualTotal = monthlyData.reduce((acc, m) => acc + m.Ingresos, 0);
-  const annualProfit = monthlyData.reduce((acc, m) => acc + m.Ganancia, 0);
+  // Solo sumar meses reales (no futuros) para el total anual
+  const realMonths = monthlyData.filter(m => !m.isFuture);
+  const annualTotal = realMonths.reduce((acc, m) => acc + (m.Ingresos || 0), 0);
+  const annualProfit = realMonths.reduce((acc, m) => acc + (m.Ganancia || 0), 0);
   const currentMonthRevenue = monthlyData[currentMonthIdx]?.Ingresos || 0;
   const prevMonthRevenue = currentMonthIdx > 0 ? (monthlyData[currentMonthIdx - 1]?.Ingresos || 0) : 0;
   const trendPercent = prevMonthRevenue > 0 ? ((currentMonthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100 : 0;
@@ -301,21 +310,29 @@ export default function FinanceSection({ subscriptions }: Props) {
               <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
               <Tooltip
                 contentStyle={{ borderRadius: '12px', border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', fontSize: '13px', padding: '12px 16px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}
-                formatter={(value: number, name: string) => {
-                  const icon = name === 'Ingresos' ? '💰' : name === 'Ganancia' ? '📈' : '📉';
-                  return [formatCOP(value), `${icon} ${name}`];
+                formatter={(value: number | null, name: string) => {
+                  if (value === null || value === undefined) return [null, null];
+                  const isProj = name.includes('Proj');
+                  const cleanName = name.replace('Proj', '');
+                  const icon = cleanName === 'Ingresos' ? '💰' : cleanName === 'Ganancia' ? '📈' : '📉';
+                  return [formatCOP(value), `${icon} ${cleanName}${isProj ? ' (proyección)' : ''}`];
                 }}
                 labelFormatter={(label) => `${MONTH_FULL[MONTH_NAMES.indexOf(label)]} ${selectedYear}`}
               />
-              <Area type="monotone" dataKey="Ingresos" stroke="hsl(var(--primary))" strokeWidth={2.5} fill="url(#gradIngresos)" dot={{ r: 3, fill: 'hsl(var(--primary))' }} activeDot={{ r: 5 }} />
-              <Area type="monotone" dataKey="Ganancia" stroke="#10b981" strokeWidth={2} fill="url(#gradGanancia)" dot={{ r: 3, fill: '#10b981' }} activeDot={{ r: 5 }} />
-              <Area type="monotone" dataKey="Costos" stroke="#ef4444" strokeWidth={1.5} strokeDasharray="5 5" fill="url(#gradCostos)" dot={false} />
+              {/* Líneas reales (sólidas) */}
+              <Area type="monotone" dataKey="Ingresos" stroke="hsl(var(--primary))" strokeWidth={2.5} fill="url(#gradIngresos)" dot={{ r: 3, fill: 'hsl(var(--primary))' }} activeDot={{ r: 5 }} connectNulls={false} />
+              <Area type="monotone" dataKey="Ganancia" stroke="#10b981" strokeWidth={2} fill="url(#gradGanancia)" dot={{ r: 3, fill: '#10b981' }} activeDot={{ r: 5 }} connectNulls={false} />
+              <Area type="monotone" dataKey="Costos" stroke="#ef4444" strokeWidth={1.5} strokeDasharray="5 5" fill="url(#gradCostos)" dot={false} connectNulls={false} />
+              {/* Líneas de proyección (punteadas, más suaves) */}
+              <Area type="monotone" dataKey="IngresosProj" stroke="hsl(var(--primary))" strokeWidth={1.5} strokeDasharray="6 4" fill="none" dot={{ r: 2, fill: 'hsl(var(--primary))', strokeDasharray: '' }} connectNulls={false} name="IngresosProj" />
+              <Area type="monotone" dataKey="GananciaProj" stroke="#10b981" strokeWidth={1.5} strokeDasharray="6 4" fill="none" dot={{ r: 2, fill: '#10b981', strokeDasharray: '' }} connectNulls={false} name="GananciaProj" />
             </AreaChart>
           </ResponsiveContainer>
-          <div className="flex justify-center gap-6 mt-3">
+          <div className="flex justify-center gap-4 sm:gap-6 mt-3 flex-wrap">
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><span className="h-2.5 w-2.5 rounded-full bg-primary inline-block" /> Ingresos</span>
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500 inline-block" /> Ganancia</span>
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><span className="h-2.5 w-2.5 rounded-full bg-red-400 inline-block" /> Costos</span>
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><span className="h-2 w-4 border-t-2 border-dashed border-muted-foreground/50 inline-block" /> Proyección</span>
           </div>
         </div>
       </div>
