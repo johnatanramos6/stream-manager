@@ -3,8 +3,8 @@ import { Subscription } from '@/types/subscription';
 import { PlatformPricing, loadPricing, savePricing, formatCOP } from '@/types/platformPricing';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { DollarSign, TrendingUp, Users, Monitor, Save, AlertCircle, Plus, X } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { DollarSign, TrendingUp, TrendingDown, Users, Monitor, Save, AlertCircle, Plus, X, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
+import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
 
 interface Props {
   subscriptions: Subscription[];
@@ -34,9 +34,13 @@ const getPlatformBrandColor = (name: string) => {
   return fallbacks[Math.abs(hash) % fallbacks.length];
 };
 
+const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const MONTH_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
 export default function FinanceSection({ subscriptions }: Props) {
   const [pricing, setPricing] = useState<PlatformPricing[]>(loadPricing);
   const [editing, setEditing] = useState(false);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   const handlePricingChange = (index: number, field: keyof PlatformPricing, value: string | number) => {
     setPricing(prev => prev.map((p, i) => i === index ? { ...p, [field]: value } : p));
@@ -127,6 +131,75 @@ export default function FinanceSection({ subscriptions }: Props) {
     Ingreso: ps.revenue,
   }));
 
+  // ── Datos mensuales para el gráfico de tendencia ──
+  const monthlyData = useMemo(() => {
+    const pricingMap = new Map(pricing.map(p => [p.platform, p]));
+    const months: { month: string; monthFull: string; Ingresos: number; Costos: number; Ganancia: number; clients: number }[] = [];
+
+    for (let m = 0; m < 12; m++) {
+      const subsInMonth = subscriptions.filter(sub => {
+        const d = new Date(sub.purchaseDate + 'T12:00:00');
+        // Un cliente genera ingreso cada mes desde su fecha de compra
+        // Si compró antes o durante este mes del año seleccionado, cuenta
+        const subStart = new Date(d.getFullYear(), d.getMonth(), 1);
+        const targetMonth = new Date(selectedYear, m, 1);
+        return subStart <= targetMonth;
+      });
+
+      let revenue = 0;
+      let cost = 0;
+      const uniqueAccounts = new Set<string>();
+
+      subsInMonth.forEach(sub => {
+        const p = pricingMap.get(sub.platform);
+        const salePrice = p ? p.salePrice : 0;
+        revenue += sub.salePriceOverride ?? salePrice;
+
+        const key = sub.accountEmail
+          ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}`
+          : `ungrouped::${sub.id}`;
+
+        const cType = (p as any)?.costType || 'per_screen';
+        if (cType === 'per_account') {
+          if (!uniqueAccounts.has(key)) {
+            uniqueAccounts.add(key);
+            cost += p?.costPrice || 0;
+          }
+        } else {
+          cost += p?.costPrice || 0;
+        }
+      });
+
+      months.push({
+        month: MONTH_NAMES[m],
+        monthFull: MONTH_FULL[m],
+        Ingresos: revenue,
+        Costos: cost,
+        Ganancia: revenue - cost,
+        clients: subsInMonth.length
+      });
+    }
+    return months;
+  }, [subscriptions, pricing, selectedYear]);
+
+  const currentMonthIdx = new Date().getMonth();
+  const annualTotal = monthlyData.reduce((acc, m) => acc + m.Ingresos, 0);
+  const annualProfit = monthlyData.reduce((acc, m) => acc + m.Ganancia, 0);
+  const currentMonthRevenue = monthlyData[currentMonthIdx]?.Ingresos || 0;
+  const prevMonthRevenue = currentMonthIdx > 0 ? (monthlyData[currentMonthIdx - 1]?.Ingresos || 0) : 0;
+  const trendPercent = prevMonthRevenue > 0 ? ((currentMonthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100 : 0;
+  const isGrowing = trendPercent >= 0;
+
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    years.add(new Date().getFullYear());
+    subscriptions.forEach(s => {
+      const y = new Date(s.purchaseDate + 'T12:00:00').getFullYear();
+      if (y > 2020) years.add(y);
+    });
+    return Array.from(years).sort((a, b) => b - a);
+  }, [subscriptions]);
+
   return (
     <div className="space-y-5 animate-fade-in">
       {/* Summary cards */}
@@ -163,12 +236,96 @@ export default function FinanceSection({ subscriptions }: Props) {
         </div>
       )}
 
-      {/* Chart */}
+      {/* ── Gráfico de Tendencia Mensual ── */}
+      <div className="bg-card rounded-xl border overflow-hidden animate-fade-in-up shadow-sm">
+        <div className="p-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-muted/10">
+          <div>
+            <h3 className="font-semibold text-sm sm:text-base flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-primary" /> Tendencia Mensual de Ingresos
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Visualiza el crecimiento mes a mes</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedYear(y => y - 1)} disabled={!availableYears.includes(selectedYear - 1) && selectedYear - 1 < Math.min(...availableYears)}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm font-bold min-w-[50px] text-center">{selectedYear}</span>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedYear(y => y + 1)} disabled={selectedYear >= new Date().getFullYear()}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Tarjetas de resumen anual */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 border-b bg-muted/5">
+          <div className="text-center p-3 rounded-lg bg-primary/5 border border-primary/10">
+            <p className="text-lg sm:text-xl font-bold text-primary">{formatCOP(annualTotal)}</p>
+            <p className="text-[10px] text-muted-foreground">Facturado {selectedYear}</p>
+          </div>
+          <div className="text-center p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
+            <p className="text-lg sm:text-xl font-bold text-emerald-600 dark:text-emerald-400">{formatCOP(annualProfit)}</p>
+            <p className="text-[10px] text-muted-foreground">Ganancia {selectedYear}</p>
+          </div>
+          <div className="text-center p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
+            <p className="text-lg sm:text-xl font-bold text-blue-600 dark:text-blue-400">{formatCOP(currentMonthRevenue)}</p>
+            <p className="text-[10px] text-muted-foreground">{MONTH_FULL[currentMonthIdx]} (actual)</p>
+          </div>
+          <div className={`text-center p-3 rounded-lg border ${isGrowing ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-red-500/5 border-red-500/10'}`}>
+            <p className={`text-lg sm:text-xl font-bold flex items-center justify-center gap-1 ${isGrowing ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
+              {isGrowing ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+              {prevMonthRevenue > 0 ? `${trendPercent > 0 ? '+' : ''}${trendPercent.toFixed(1)}%` : '—'}
+            </p>
+            <p className="text-[10px] text-muted-foreground">vs. {currentMonthIdx > 0 ? MONTH_FULL[currentMonthIdx - 1] : '—'}</p>
+          </div>
+        </div>
+
+        <div className="p-4 pt-6">
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={monthlyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="gradIngresos" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="gradGanancia" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="gradCostos" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.15} />
+                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+              <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
+              <Tooltip
+                contentStyle={{ borderRadius: '12px', border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', fontSize: '13px', padding: '12px 16px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}
+                formatter={(value: number, name: string) => {
+                  const icon = name === 'Ingresos' ? '💰' : name === 'Ganancia' ? '📈' : '📉';
+                  return [formatCOP(value), `${icon} ${name}`];
+                }}
+                labelFormatter={(label) => `${MONTH_FULL[MONTH_NAMES.indexOf(label)]} ${selectedYear}`}
+              />
+              <Area type="monotone" dataKey="Ingresos" stroke="hsl(var(--primary))" strokeWidth={2.5} fill="url(#gradIngresos)" dot={{ r: 3, fill: 'hsl(var(--primary))' }} activeDot={{ r: 5 }} />
+              <Area type="monotone" dataKey="Ganancia" stroke="#10b981" strokeWidth={2} fill="url(#gradGanancia)" dot={{ r: 3, fill: '#10b981' }} activeDot={{ r: 5 }} />
+              <Area type="monotone" dataKey="Costos" stroke="#ef4444" strokeWidth={1.5} strokeDasharray="5 5" fill="url(#gradCostos)" dot={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+          <div className="flex justify-center gap-6 mt-3">
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><span className="h-2.5 w-2.5 rounded-full bg-primary inline-block" /> Ingresos</span>
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500 inline-block" /> Ganancia</span>
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><span className="h-2.5 w-2.5 rounded-full bg-red-400 inline-block" /> Costos</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Chart de Rentabilidad por plataforma */}
       {chartData.length > 0 && (
         <div className="bg-card rounded-xl border overflow-hidden animate-fade-in-up shadow-sm">
           <div className="p-4 border-b flex justify-between items-center bg-muted/10">
             <div>
-              <h3 className="font-semibold text-sm sm:text-base">Análisis de Rentabilidad</h3>
+              <h3 className="font-semibold text-sm sm:text-base">Análisis de Rentabilidad por Plataforma</h3>
               <p className="text-xs text-muted-foreground mt-0.5">Ingresos divididos en Costo base (Abajo) y Ganancia Neta (Arriba)</p>
             </div>
           </div>
