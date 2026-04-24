@@ -89,17 +89,87 @@ function IndexContent() {
     try {
       let rows: string[][] = [];
       let headers: string[] = [];
+      let sheetPlatform = ''; // Plataforma derivada del nombre de la hoja
       const isExcel = file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls');
       
       if (isExcel) {
         const arrayBuffer = await file.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const rawData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-        if (rawData.length > 1) {
-          headers = rawData[0].map(String);
-          rows = rawData.slice(1).map(r => r.map(c => c === null || c === undefined ? '' : String(c)));
+
+        // Leer TODAS las hojas del archivo Excel
+        for (const sheetName of workbook.SheetNames) {
+          const worksheet = workbook.Sheets[sheetName];
+          const rawData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          // Filtrar filas completamente vacías
+          const validRows = rawData.filter(r => r && r.some(c => c !== null && c !== undefined && String(c).trim() !== ''));
+          
+          if (validRows.length < 2) continue; // Saltar hojas vacías o con solo logos
+
+          const sheetHeaders = validRows[0].map(c => c === null || c === undefined ? '' : String(c));
+          const sheetRows = validRows.slice(1).map(r => r.map(c => c === null || c === undefined ? '' : String(c)));
+
+          // Si la primera hoja tiene cabeceras válidas (columnas como Cliente, Correo, etc.), úsala normal
+          const hasValidHeaders = sheetHeaders.some(h => {
+            const hl = h.toLowerCase();
+            return hl.includes('cliente') || hl.includes('nombre') || hl.includes('correo') || hl.includes('email') || hl.includes('plataforma');
+          });
+
+          if (hasValidHeaders && headers.length === 0) {
+            // Primera hoja con cabeceras válidas: usarla como hoja principal
+            headers = sheetHeaders;
+            rows = rows.concat(sheetRows);
+          } else {
+            // Hoja sin cabeceras estándar: asumir que es una hoja por plataforma
+            // El nombre de la hoja = nombre de la plataforma
+            const platformName = sheetName.trim();
+            
+            // Intentar detectar cabeceras en esta hoja también
+            const localHeaders = sheetHeaders;
+            const localGetIdx = (words: string[]) => localHeaders.findIndex(h => words.some(w => h.toLowerCase().includes(w)));
+            const localHasHeaders = localGetIdx(['cliente', 'nombre']) !== -1 || localGetIdx(['correo', 'email']) !== -1;
+
+            if (localHasHeaders) {
+              // La hoja tiene sus propias cabeceras
+              if (headers.length === 0) headers = localHeaders;
+              // Agregar columna de plataforma si no existe
+              const platIdx = localGetIdx(['plataforma', 'servicio']);
+              for (const row of sheetRows) {
+                if (platIdx === -1) {
+                  // Agregar plataforma del nombre de la hoja al final
+                  row.push(platformName);
+                } else {
+                  // Sobreescribir plataforma vacía con nombre de la hoja
+                  if (!row[platIdx] || row[platIdx].trim() === '') row[platIdx] = platformName;
+                }
+              }
+              if (platIdx === -1 && !headers.includes('Plataforma')) headers.push('Plataforma');
+              rows = rows.concat(sheetRows);
+            } else {
+              // Hoja simple sin cabeceras: la primera columna es el nombre del cliente
+              for (const row of sheetRows) {
+                const firstName = row.find(c => c && c.trim() !== '');
+                if (!firstName) continue;
+                // Crear fila con formato: [Cliente, Teléfono, Plataforma, Correo, Contraseña, PIN...]
+                const normalizedRow = [
+                  row[0] || '', // Cliente
+                  row[1] || '', // Teléfono
+                  platformName, // Plataforma (del nombre de la hoja)
+                  row[2] || '', // Correo
+                  row[3] || '', // Contraseña
+                  row[4] || '', // PIN
+                  row[5] || '', // Fecha
+                  row[6] || '', // Estado
+                  row[7] || '', // Notas
+                  row[8] || '', // Nombre Cuenta
+                  row[9] || '', // Precio
+                ];
+                rows.push(normalizedRow);
+              }
+              if (headers.length === 0) {
+                headers = ['Cliente', 'Teléfono', 'Plataforma', 'Correo', 'Contraseña', 'PIN', 'Fecha Adquisición', 'Estado', 'Notas', 'Nombre Cuenta', 'Precio Acordado'];
+              }
+            }
+          }
         }
       } else {
         const text = await file.text();
