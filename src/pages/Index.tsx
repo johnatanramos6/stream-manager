@@ -96,79 +96,115 @@ function IndexContent() {
         const arrayBuffer = await file.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer, { type: 'array' });
 
-        // Leer TODAS las hojas del archivo Excel
+        // Leer TODAS las hojas del archivo Excel y escanear encabezados reales
         for (const sheetName of workbook.SheetNames) {
           const worksheet = workbook.Sheets[sheetName];
           const rawData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-          // Filtrar filas completamente vacías
-          const validRows = rawData.filter(r => r && r.some(c => c !== null && c !== undefined && String(c).trim() !== ''));
           
-          if (validRows.length < 2) continue; // Saltar hojas vacías o con solo logos
+          if (!rawData || rawData.length < 2) continue;
 
-          const sheetHeaders = validRows[0].map(c => c === null || c === undefined ? '' : String(c));
-          const sheetRows = validRows.slice(1).map(r => r.map(c => c === null || c === undefined ? '' : String(c)));
+          // Encontrar la fila de encabezados reales (escaneando hasta la fila 30)
+          let headerRowIndex = -1;
+          let localHeaders: string[] = [];
 
-          // Si la primera hoja tiene cabeceras válidas (columnas como Cliente, Correo, etc.), úsala normal
-          const hasValidHeaders = sheetHeaders.some(h => {
-            const hl = h.toLowerCase();
-            return hl.includes('cliente') || hl.includes('nombre') || hl.includes('correo') || hl.includes('email') || hl.includes('plataforma');
-          });
-
-          if (hasValidHeaders && headers.length === 0) {
-            // Primera hoja con cabeceras válidas: usarla como hoja principal
-            headers = sheetHeaders;
-            rows = rows.concat(sheetRows);
-          } else {
-            // Hoja sin cabeceras estándar: asumir que es una hoja por plataforma
-            // El nombre de la hoja = nombre de la plataforma
-            const platformName = sheetName.trim();
+          for (let i = 0; i < Math.min(rawData.length, 30); i++) {
+            const row = rawData[i];
+            if (!row) continue;
             
-            // Intentar detectar cabeceras en esta hoja también
-            const localHeaders = sheetHeaders;
-            const localGetIdx = (words: string[]) => localHeaders.findIndex(h => words.some(w => h.toLowerCase().includes(w)));
-            const localHasHeaders = localGetIdx(['cliente', 'nombre']) !== -1 || localGetIdx(['correo', 'email']) !== -1;
+            const stringRow = row.map(c => c === null || c === undefined ? '' : String(c).trim());
+            const hasKeyHeader = stringRow.some(c => {
+              const lower = c.toLowerCase();
+              return lower === 'nombre' || lower === 'cliente' || lower === 'correo' || lower === 'celular' || lower === 'perfil';
+            });
 
-            if (localHasHeaders) {
-              // La hoja tiene sus propias cabeceras
-              if (headers.length === 0) headers = localHeaders;
-              // Agregar columna de plataforma si no existe
-              const platIdx = localGetIdx(['plataforma', 'servicio']);
-              for (const row of sheetRows) {
-                if (platIdx === -1) {
-                  // Agregar plataforma del nombre de la hoja al final
-                  row.push(platformName);
-                } else {
-                  // Sobreescribir plataforma vacía con nombre de la hoja
-                  if (!row[platIdx] || row[platIdx].trim() === '') row[platIdx] = platformName;
-                }
-              }
-              if (platIdx === -1 && !headers.includes('Plataforma')) headers.push('Plataforma');
-              rows = rows.concat(sheetRows);
-            } else {
-              // Hoja simple sin cabeceras: la primera columna es el nombre del cliente
-              for (const row of sheetRows) {
-                const firstName = row.find(c => c && c.trim() !== '');
-                if (!firstName) continue;
-                // Crear fila con formato: [Cliente, Teléfono, Plataforma, Correo, Contraseña, PIN...]
-                const normalizedRow = [
-                  row[0] || '', // Cliente
-                  row[1] || '', // Teléfono
-                  platformName, // Plataforma (del nombre de la hoja)
-                  row[2] || '', // Correo
-                  row[3] || '', // Contraseña
-                  row[4] || '', // PIN
-                  row[5] || '', // Fecha
-                  row[6] || '', // Estado
-                  row[7] || '', // Notas
-                  row[8] || '', // Nombre Cuenta
-                  row[9] || '', // Precio
-                ];
-                rows.push(normalizedRow);
-              }
-              if (headers.length === 0) {
-                headers = ['Cliente', 'Teléfono', 'Plataforma', 'Correo', 'Contraseña', 'PIN', 'Fecha Adquisición', 'Estado', 'Notas', 'Nombre Cuenta', 'Precio Acordado'];
-              }
+            if (hasKeyHeader) {
+              headerRowIndex = i;
+              localHeaders = stringRow;
+              break;
             }
+          }
+
+          if (headerRowIndex === -1) {
+            console.warn(`Hoja "${sheetName}" saltada: no se encontraron encabezados reales.`);
+            continue;
+          }
+
+          // Ya tenemos los encabezados de esta hoja
+          const platformName = sheetName.trim();
+          
+          const localGetIdx = (words: string[]) => localHeaders.findIndex(h => words.some(w => h.toLowerCase().includes(w)));
+          const idxClientLocal = localGetIdx(['cliente', 'nombre']);
+          const idxPhoneLocal = localGetIdx(['teléfono', 'telefono', 'celular']);
+          const idxEmailLocal = localGetIdx(['correo', 'email']);
+          const idxPassLocal = localGetIdx(['contraseña', 'password', 'clave']);
+          const idxPinLocal = localGetIdx(['pin']); // Evitar que 'perfil' caiga aquí si hay 'pin'
+          const idxAccountNameLocal = localGetIdx(['perfil', 'cuenta', 'pantalla']);
+          
+          const idxDateLocal = localGetIdx(['fecha', 'adquisición', 'adquisicion']);
+          const idxExpLocal = localGetIdx(['expiración', 'expiracion']);
+          const idxStatusLocal = localGetIdx(['estado', 'pago']);
+          const idxNotesLocal = localGetIdx(['nota', 'observaci', 'alerta']);
+          const idxPriceLocal = localGetIdx(['precio', 'acordado']);
+
+          for (let i = headerRowIndex + 1; i < rawData.length; i++) {
+            const rawRow = rawData[i];
+            if (!rawRow || !rawRow.some(c => c !== null && c !== undefined && String(c).trim() !== '')) continue;
+            
+            const stringRow = rawRow.map(c => c === null || c === undefined ? '' : String(c).trim());
+            const clientName = idxClientLocal !== -1 ? stringRow[idxClientLocal] : '';
+            
+            // Ignorar basura, repetición de encabezados o filas vacías
+            if (!clientName || clientName.toLowerCase() === 'nombre') continue;
+
+            let finalDate = '';
+            if (idxExpLocal !== -1 && stringRow[idxExpLocal]) {
+              // Convertir Expiración a Fecha Adquisición (-30 días)
+              let expDateRaw = stringRow[idxExpLocal];
+              let parsedExpDate: Date | null = null;
+              
+              if (!isNaN(Number(expDateRaw))) {
+                 // Formato serial de Excel
+                 parsedExpDate = new Date(Math.round((Number(expDateRaw) - 25569) * 86400 * 1000));
+              } else {
+                 // Formato string (ej. 20/08/24)
+                 const parts = expDateRaw.split(/[\/\-]/);
+                 if (parts.length === 3) {
+                    let y = parseInt(parts[2]);
+                    if (y < 100) y += 2000;
+                    parsedExpDate = new Date(y, parseInt(parts[1]) - 1, parseInt(parts[0]));
+                 }
+              }
+              
+              if (parsedExpDate && !isNaN(parsedExpDate.getTime())) {
+                parsedExpDate.setDate(parsedExpDate.getDate() - 30);
+                finalDate = parsedExpDate.toISOString().split('T')[0];
+              } else {
+                finalDate = expDateRaw; // Fallback
+              }
+            } else if (idxDateLocal !== -1 && stringRow[idxDateLocal]) {
+              finalDate = stringRow[idxDateLocal];
+            }
+
+            // Normalizar la fila a un formato estándar para evitar conflictos de orden de columnas entre hojas
+            const normalizedRow = [
+              clientName,
+              idxPhoneLocal !== -1 ? stringRow[idxPhoneLocal] : '',
+              platformName,
+              idxEmailLocal !== -1 ? stringRow[idxEmailLocal] : '',
+              idxPassLocal !== -1 ? stringRow[idxPassLocal] : '',
+              idxPinLocal !== -1 ? stringRow[idxPinLocal] : (idxAccountNameLocal !== -1 ? stringRow[idxAccountNameLocal] : ''),
+              finalDate,
+              idxStatusLocal !== -1 ? stringRow[idxStatusLocal] : '',
+              idxNotesLocal !== -1 ? stringRow[idxNotesLocal] : '',
+              idxAccountNameLocal !== -1 ? stringRow[idxAccountNameLocal] : '',
+              idxPriceLocal !== -1 ? stringRow[idxPriceLocal] : '',
+            ];
+            rows.push(normalizedRow);
+          }
+          
+          if (headers.length === 0) {
+            // Establecer encabezados estándar para que coincidan con los índices posteriores
+            headers = ['Cliente', 'Teléfono', 'Plataforma', 'Correo', 'Contraseña', 'PIN', 'Fecha Adquisición', 'Estado', 'Notas', 'Nombre Cuenta', 'Precio Acordado'];
           }
         }
       } else {
