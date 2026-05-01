@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Subscription, Platform, PaymentStatus, getDaysUntilPayment } from '@/types/subscription';
-import { loadPricing } from '@/types/platformPricing';
+import { DEFAULT_PRICING } from '@/types/platformPricing';
 import SubscriptionForm from '@/components/SubscriptionForm';
 import SubscriptionTable from '@/components/SubscriptionTable';
 import StatsBar, { QuickFilter } from '@/components/StatsBar';
@@ -53,13 +53,15 @@ function IndexContent() {
   const [showFilters, setShowFilters] = useState(false);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
   const [showAdmin, setShowAdmin] = useState(false);
+  const [pricingConfig, setPricingConfig] = useState(DEFAULT_PRICING);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const dynamicPlatforms = loadPricing().map(p => p.platform);
+  const dynamicPlatforms = pricingConfig.map(p => p.platform);
 
   useEffect(() => {
     if (!user) return;
     const fetchDb = async () => {
+      // Cargar suscripciones
       const { data, error } = await supabase.from('subscriptions').select().eq('vendor_id', user.id);
       if (data) {
         setSubs(data.map(d => ({
@@ -77,7 +79,13 @@ function IndexContent() {
           salePriceOverride: d.sale_price_override
         })));
       }
-      if (error) toast.error("Error al cargar la base de datos.");
+      if (error) toast.error("Error al cargar las suscripciones.");
+
+      // Cargar configuración de precios desde Supabase
+      const { data: vendorData } = await supabase.from('vendors').select('pricing_config').eq('id', user.id).single();
+      if (vendorData && vendorData.pricing_config) {
+        setPricingConfig(vendorData.pricing_config);
+      }
     };
     fetchDb();
   }, [user]);
@@ -585,6 +593,8 @@ function IndexContent() {
         onClose={() => { setFormOpen(false); setEditing(null); }}
         onSave={handleSave}
         initial={editing}
+        dynamicPlatforms={dynamicPlatforms}
+        allSubscriptions={subs}
       />
 
       {/* ── Delete Confirmation ── */}

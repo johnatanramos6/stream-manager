@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Subscription, Platform, PaymentStatus } from '@/types/subscription';
-import { loadPricing } from '@/types/platformPricing';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,17 +12,11 @@ interface Props {
   onClose: () => void;
   onSave: (sub: Subscription) => void;
   initial?: Subscription | null;
+  dynamicPlatforms?: string[];
+  allSubscriptions?: Subscription[];
 }
 
-function loadExistingAccounts(): Subscription[] {
-  try {
-    const raw = localStorage.getItem('streaming-subscriptions');
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return [];
-}
-
-export default function SubscriptionForm({ open, onClose, onSave, initial }: Props) {
+export default function SubscriptionForm({ open, onClose, onSave, initial, dynamicPlatforms = [], allSubscriptions = [] }: Props) {
   const empty: Omit<Subscription, 'id'> = {
     platform: 'Netflix',
     accountEmail: '',
@@ -41,14 +34,9 @@ export default function SubscriptionForm({ open, onClose, onSave, initial }: Pro
     initial ? { ...initial } : empty
   );
 
-  const dynamicPlatforms = useMemo(() => {
-    return loadPricing().map(p => p.platform);
-  }, [open]);
-
   const existingAccounts = useMemo(() => {
-    const subs = loadExistingAccounts();
     const map = new Map<string, { email: string; password: string; accountName: string }>();
-    subs.forEach(s => {
+    allSubscriptions.forEach(s => {
       if (s.accountEmail) {
         const key = `${s.platform}::${s.accountEmail}`;
         if (!map.has(key)) {
@@ -57,7 +45,7 @@ export default function SubscriptionForm({ open, onClose, onSave, initial }: Pro
       }
     });
     return map;
-  }, [open]);
+  }, [allSubscriptions, open]);
 
   const emailSuggestions = useMemo(() => {
     const suggestions: { email: string; password: string; accountName: string }[] = [];

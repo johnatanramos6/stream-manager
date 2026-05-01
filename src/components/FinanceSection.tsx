@@ -1,9 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Subscription } from '@/types/subscription';
-import { PlatformPricing, loadPricing, savePricing, formatCOP } from '@/types/platformPricing';
+import { PlatformPricing, DEFAULT_PRICING, formatCOP } from '@/types/platformPricing';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { DollarSign, TrendingUp, TrendingDown, Users, Monitor, Save, AlertCircle, Plus, X, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Users, Monitor, Save, AlertCircle, Plus, X, ChevronLeft, ChevronRight, CalendarDays, Loader2 } from 'lucide-react';
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
 
 interface Props {
@@ -38,9 +41,24 @@ const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Se
 const MONTH_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 export default function FinanceSection({ subscriptions }: Props) {
-  const [pricing, setPricing] = useState<PlatformPricing[]>(loadPricing);
+  const { user } = useAuth();
+  const [pricing, setPricing] = useState<PlatformPricing[]>(DEFAULT_PRICING);
   const [editing, setEditing] = useState(false);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchPricing = async () => {
+      const { data, error } = await supabase.from('vendors').select('pricing_config').eq('id', user.id).single();
+      if (data && data.pricing_config) {
+        setPricing(data.pricing_config);
+      } else {
+        setPricing([...DEFAULT_PRICING]);
+      }
+    };
+    fetchPricing();
+  }, [user]);
 
   const handlePricingChange = (index: number, field: keyof PlatformPricing, value: string | number) => {
     setPricing(prev => prev.map((p, i) => i === index ? { ...p, [field]: value } : p));
@@ -54,9 +72,19 @@ export default function FinanceSection({ subscriptions }: Props) {
     setPricing(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSavePricing = () => {
-    savePricing(pricing);
-    setEditing(false);
+  const handleSavePricing = async () => {
+    if (!user) return;
+    setIsSaving(true);
+    const { error } = await supabase.from('vendors').update({ pricing_config: pricing }).eq('id', user.id);
+    setIsSaving(false);
+    
+    if (error) {
+      toast.error('Error al guardar los precios');
+      console.error(error);
+    } else {
+      toast.success('Precios guardados en la nube correctamente');
+      setEditing(false);
+    }
   };
 
   const stats = useMemo(() => {
@@ -429,8 +457,9 @@ export default function FinanceSection({ subscriptions }: Props) {
               <Button size="sm" variant="outline" onClick={handleAddPlatform} className="gap-1.5 border-dashed">
                 <Plus className="h-3.5 w-3.5" /> Agregar Plataforma
               </Button>
-              <Button size="sm" onClick={handleSavePricing} className="gap-1.5 shadow-lg shadow-primary/20">
-                <Save className="h-3.5 w-3.5" /> Guardar
+              <Button size="sm" onClick={handleSavePricing} disabled={isSaving} className="gap-1.5 shadow-lg shadow-primary/20">
+                {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                {isSaving ? 'Guardando...' : 'Guardar'}
               </Button>
             </div>
           ) : (
