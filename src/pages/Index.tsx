@@ -272,6 +272,7 @@ function IndexContent() {
           const localGetIdx = (words: string[]) => localHeaders.findIndex(h => words.some(w => h.toLowerCase().includes(w)));
           const idxClientLocal = localGetIdx(['cliente', 'nombre']);
           const idxPhoneLocal = localGetIdx(['teléfono', 'telefono', 'celular']);
+          const idxPlatformLocal = localGetIdx(['plataforma', 'servicio']);
           const idxEmailLocal = localGetIdx(['correo', 'email']);
           const idxPassLocal = localGetIdx(['contraseña', 'password', 'clave']);
           const idxPinLocal = localGetIdx(['pin']); // Evitar que 'perfil' caiga aquí si hay 'pin'
@@ -292,6 +293,24 @@ function IndexContent() {
             
             // Ignorar basura, repetición de encabezados o filas vacías
             if (!clientName || clientName.toLowerCase() === 'nombre') continue;
+
+            // Determinar la plataforma: priorizar la columna Plataforma, luego el nombre de la hoja
+            let resolvedPlatform = platformName;
+            if (idxPlatformLocal !== -1 && stringRow[idxPlatformLocal]) {
+              resolvedPlatform = stringRow[idxPlatformLocal];
+            }
+
+            // Normalizar estado de pago (convertir emojis/texto legible a valores internos)
+            let rawStatus = idxStatusLocal !== -1 ? stringRow[idxStatusLocal] : '';
+            let normalizedStatus = rawStatus;
+            const statusLower = rawStatus.toLowerCase();
+            if (statusLower.includes('pagado') || statusLower.includes('✅')) {
+              normalizedStatus = 'pagado';
+            } else if (statusLower.includes('cobrar') || statusLower.includes('🔴')) {
+              normalizedStatus = 'cobrar';
+            } else if (statusLower.includes('debe') || statusLower.includes('⚠')) {
+              normalizedStatus = 'debe';
+            }
 
             let finalDate = '';
             if (idxExpLocal !== -1 && stringRow[idxExpLocal]) {
@@ -322,16 +341,16 @@ function IndexContent() {
               finalDate = stringRow[idxDateLocal];
             }
 
-            // Normalizar la fila a un formato estándar para evitar conflictos de orden de columnas entre hojas
+            // Normalizar la fila a un formato estándar
             const normalizedRow = [
               clientName,
               idxPhoneLocal !== -1 ? stringRow[idxPhoneLocal] : '',
-              platformName,
+              resolvedPlatform,
               idxEmailLocal !== -1 ? stringRow[idxEmailLocal] : '',
               idxPassLocal !== -1 ? stringRow[idxPassLocal] : '',
               idxPinLocal !== -1 ? stringRow[idxPinLocal] : (idxAccountNameLocal !== -1 ? stringRow[idxAccountNameLocal] : ''),
               finalDate,
-              idxStatusLocal !== -1 ? stringRow[idxStatusLocal] : '',
+              normalizedStatus,
               idxNotesLocal !== -1 ? stringRow[idxNotesLocal] : '',
               idxAccountNameLocal !== -1 ? stringRow[idxAccountNameLocal] : '',
               idxPriceLocal !== -1 ? stringRow[idxPriceLocal] : '',
