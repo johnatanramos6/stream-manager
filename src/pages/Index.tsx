@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Subscription, Platform, PaymentStatus, getDaysUntilPayment } from '@/types/subscription';
-import { DEFAULT_PRICING } from '@/types/platformPricing';
+import { DEFAULT_PRICING, PlatformPricing } from '@/types/platformPricing';
 import SubscriptionForm from '@/components/SubscriptionForm';
 import SubscriptionTable from '@/components/SubscriptionTable';
 import StatsBar, { QuickFilter } from '@/components/StatsBar';
@@ -23,21 +23,150 @@ import AdminPanel from '@/components/AdminPanel';
 // Deprecated local storage methods removed.
 // We keep exportCSV standard since it's pure logic.
 
-function exportCSV(subs: Subscription[]) {
-  const headers = ['Cliente', 'Teléfono', 'Plataforma', 'Correo', 'Contraseña', 'PIN', 'Fecha Adquisición', 'Estado', 'Notas', 'Nombre Cuenta', 'Precio Acordado'];
-  const rows = subs.map(s => [
+function exportExcel(subs: Subscription[], pricing: PlatformPricing[]) {
+  const wb = XLSX.utils.book_new();
+
+  // ═══════════════════════════════════════════
+  // HOJA 1: Clientes
+  // ═══════════════════════════════════════════
+  const clientHeaders = ['Cliente', 'Teléfono', 'Plataforma', 'Correo', 'Contraseña', 'PIN', 'Fecha Adquisición', 'Estado', 'Notas', 'Nombre Cuenta', 'Precio Acordado'];
+  const clientRows = subs.map(s => [
     s.clientName, s.clientPhone || '', s.platform, s.accountEmail, s.accountPassword,
-    s.profilePin, s.purchaseDate, s.paymentStatus, s.notes, s.accountName || '', s.salePriceOverride ? String(s.salePriceOverride) : ''
+    s.profilePin, s.purchaseDate, s.paymentStatus === 'pagado' ? '✅ Pagado' : s.paymentStatus === 'debe' ? '⚠️ Debe' : '🔴 Cobrar',
+    s.notes, s.accountName || '', s.salePriceOverride || ''
   ]);
-  const csv = [headers, ...rows].map(r => r.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
-  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `streammanager_${new Date().toISOString().split('T')[0]}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-  toast.success('Archivo CSV descargado');
+  const wsClients = XLSX.utils.aoa_to_sheet([clientHeaders, ...clientRows]);
+  // Ajustar anchos de columna
+  wsClients['!cols'] = clientHeaders.map((h, i) => ({ wch: Math.max(h.length, ...(clientRows.map(r => String(r[i] || '').length)), 12) }));
+  XLSX.utils.book_append_sheet(wb, wsClients, 'Clientes');
+
+  // ═══════════════════════════════════════════
+  // HOJA 2: Plataformas y Precios
+  // ═══════════════════════════════════════════
+  const pricingHeaders = ['Plataforma', 'Tipo Costo', 'Precio Compra ($)', 'Precio Venta ($)', 'Ganancia por unidad ($)'];
+  const pricingRows = pricing.map(p => [
+    p.platform,
+    p.costType === 'per_account' ? 'Por Cuenta' : 'Por Pantalla',
+    p.costPrice,
+    p.salePrice,
+    p.salePrice - p.costPrice
+  ]);
+  const wsPricing = XLSX.utils.aoa_to_sheet([pricingHeaders, ...pricingRows]);
+  wsPricing['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 18 }, { wch: 18 }, { wch: 22 }];
+  XLSX.utils.book_append_sheet(wb, wsPricing, 'Plataformas y Precios');
+
+  // ═══════════════════════════════════════════
+  // HOJA 3: Resumen Financiero Mensual
+  // ═══════════════════════════════════════════
+  const pricingMap = new Map(pricing.map(p => [p.platform, p]));
+  const MONTH_NAMES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth();
+
+  const financeHeaders = ['Mes', 'Clientes Activos', 'Ingresos ($)', 'Costos ($)', 'Ganancia Neta ($)', 'Margen (%)'];
+  const financeRows: (string | number)[][] = [];
+  let totalIngresos = 0, totalCostos = 0, totalGanancia = 0;
+
+  for (let m = 0; m <= currentMonth; m++) {
+    const subsInMonth = subs.filter(sub => {
+      const d = new Date(sub.purchaseDate + 'T12:00:00');
+      const subStart = new Date(d.getFullYear(), d.getMonth(), 1);
+      const targetMonth = new Date(currentYear, m, 1);
+      return subStart <= targetMonth;
+    });
+
+    let revenue = 0;
+    let cost = 0;
+    const uniqueAccounts = new Set<string>();
+
+    subsInMonth.forEach(sub => {
+      const p = pricingMap.get(sub.platform);
+      const salePrice = p ? p.salePrice : 0;
+      revenue += sub.salePriceOverride ?? salePrice;
+
+      const key = sub.accountEmail
+        ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}`
+        : `ungrouped::${sub.id}`;
+
+      const cType = (p as any)?.costType || 'per_screen';
+      if (cType === 'per_account') {
+        if (!uniqueAccounts.has(key)) {
+          uniqueAccounts.add(key);
+          cost += p?.costPrice || 0;
+        }
+      } else {
+        cost += p?.costPrice || 0;
+      }
+    });
+
+    const profit = revenue - cost;
+    const margin = revenue > 0 ? ((profit / revenue) * 100) : 0;
+    totalIngresos += revenue;
+    totalCostos += cost;
+    totalGanancia += profit;
+
+    financeRows.push([
+      MONTH_NAMES_FULL[m],
+      subsInMonth.length,
+      revenue,
+      cost,
+      profit,
+      Math.round(margin * 10) / 10
+    ]);
+  }
+
+  // Fila de totales
+  financeRows.push([]);
+  financeRows.push([
+    'TOTAL ANUAL',
+    '',
+    totalIngresos,
+    totalCostos,
+    totalGanancia,
+    totalIngresos > 0 ? Math.round(((totalGanancia / totalIngresos) * 100) * 10) / 10 : 0
+  ]);
+
+  // Hoja 3b: Detalle por plataforma
+  financeRows.push([]);
+  financeRows.push(['--- DETALLE POR PLATAFORMA ---', '', '', '', '', '']);
+  financeRows.push(['Plataforma', 'Cuentas', 'Pantallas', 'Costo Total ($)', 'Ingreso Total ($)', 'Ganancia Neta ($)']);
+
+  const platformStatsMap = new Map<string, { accounts: number; clients: number; revenue: number; cost: number }>();
+  const uniqueGlobalAccounts = new Set<string>();
+
+  subs.forEach(sub => {
+    const p = pricingMap.get(sub.platform);
+    const salePrice = p ? p.salePrice : 0;
+    const actualRevenue = sub.salePriceOverride ?? salePrice;
+    const ps = platformStatsMap.get(sub.platform) || { accounts: 0, clients: 0, revenue: 0, cost: 0 };
+    ps.clients++;
+    ps.revenue += actualRevenue;
+
+    const key = sub.accountEmail
+      ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}`
+      : `ungrouped::${sub.id}`;
+    if (!uniqueGlobalAccounts.has(key)) {
+      uniqueGlobalAccounts.add(key);
+      ps.accounts++;
+    }
+    platformStatsMap.set(sub.platform, ps);
+  });
+
+  platformStatsMap.forEach((ps, platform) => {
+    const p = pricingMap.get(platform) || { costPrice: 0, costType: 'per_screen' };
+    const cType = (p as any).costType || 'per_screen';
+    const totalCostPlat = cType === 'per_account' ? (ps.accounts * p.costPrice) : (ps.clients * p.costPrice);
+    const profit = ps.revenue - totalCostPlat;
+    financeRows.push([platform, ps.accounts, ps.clients, totalCostPlat, ps.revenue, profit]);
+  });
+
+  const wsFinance = XLSX.utils.aoa_to_sheet([financeHeaders, ...financeRows]);
+  wsFinance['!cols'] = [{ wch: 25 }, { wch: 18 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 12 }];
+  XLSX.utils.book_append_sheet(wb, wsFinance, 'Resumen Financiero');
+
+  // Descargar
+  XLSX.writeFile(wb, `StreamManager_${new Date().toISOString().split('T')[0]}.xlsx`);
+  toast.success('Reporte Excel descargado con éxito');
 }
 
 function IndexContent() {
@@ -481,8 +610,8 @@ function IndexContent() {
                 <Button variant="outline" size="sm" className="flex gap-1.5 px-2 sm:px-3 text-xs" onClick={() => fileInputRef.current?.click()} title="Importar Excel/CSV">
                   <Upload className="h-4 w-4 sm:h-3.5 sm:w-3.5" /> <span className="hidden lg:inline">Importar</span>
                 </Button>
-                <Button variant="outline" size="sm" className="flex gap-1.5 px-2 sm:px-3 text-xs" onClick={() => exportCSV(subs)}>
-                  <Download className="h-4 w-4 sm:h-3.5 sm:w-3.5" /> <span className="hidden sm:inline">Excel/CSV</span>
+                <Button variant="outline" size="sm" className="flex gap-1.5 px-2 sm:px-3 text-xs" onClick={() => exportExcel(subs, pricingConfig)}>
+                  <Download className="h-4 w-4 sm:h-3.5 sm:w-3.5" /> <span className="hidden sm:inline">Descargar Excel</span>
                 </Button>
                 <Button onClick={() => { setEditing(null); setFormOpen(true); }} className="gap-1.5 text-xs hidden sm:flex shadow-lg shadow-primary/20">
                   <Plus className="h-4 w-4" /> Agregar
