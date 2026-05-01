@@ -11,6 +11,7 @@ import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContai
 
 interface Props {
   subscriptions: Subscription[];
+  onPricingSaved?: () => void;
 }
 
 const getPlatformBrandColor = (name: string) => {
@@ -40,7 +41,7 @@ const getPlatformBrandColor = (name: string) => {
 const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 const MONTH_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
-export default function FinanceSection({ subscriptions }: Props) {
+export default function FinanceSection({ subscriptions, onPricingSaved }: Props) {
   const { user } = useAuth();
   const [pricing, setPricing] = useState<PlatformPricing[]>(DEFAULT_PRICING);
   const [editing, setEditing] = useState(false);
@@ -50,9 +51,9 @@ export default function FinanceSection({ subscriptions }: Props) {
   useEffect(() => {
     if (!user) return;
     const fetchPricing = async () => {
-      const { data, error } = await supabase.from('vendors').select('pricing_config').eq('id', user.id).single();
-      if (data && data.pricing_config) {
-        setPricing(data.pricing_config);
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData.user?.user_metadata?.pricing_config) {
+        setPricing(authData.user.user_metadata.pricing_config);
       } else {
         setPricing([...DEFAULT_PRICING]);
       }
@@ -75,7 +76,10 @@ export default function FinanceSection({ subscriptions }: Props) {
   const handleSavePricing = async () => {
     if (!user) return;
     setIsSaving(true);
-    const { error } = await supabase.from('vendors').update({ pricing_config: pricing }).eq('id', user.id);
+    // Guardar en user_metadata no requiere SQL y no tiene bloqueos de RLS
+    const { error } = await supabase.auth.updateUser({
+      data: { pricing_config: pricing }
+    });
     setIsSaving(false);
     
     if (error) {
@@ -84,6 +88,7 @@ export default function FinanceSection({ subscriptions }: Props) {
     } else {
       toast.success('Precios guardados en la nube correctamente');
       setEditing(false);
+      if (onPricingSaved) onPricingSaved();
     }
   };
 

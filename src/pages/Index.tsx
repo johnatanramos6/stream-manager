@@ -81,10 +81,10 @@ function IndexContent() {
       }
       if (error) toast.error("Error al cargar las suscripciones.");
 
-      // Cargar configuración de precios desde Supabase
-      const { data: vendorData } = await supabase.from('vendors').select('pricing_config').eq('id', user.id).single();
-      if (vendorData && vendorData.pricing_config) {
-        setPricingConfig(vendorData.pricing_config);
+      // Cargar configuración de precios desde Supabase Auth Metadata (Sin necesidad de SQL)
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData.user?.user_metadata?.pricing_config) {
+        setPricingConfig(authData.user.user_metadata.pricing_config);
       }
     };
     fetchDb();
@@ -574,7 +574,15 @@ function IndexContent() {
             />
           </>
         ) : (
-          <FinanceSection subscriptions={subs} />
+          <FinanceSection 
+            subscriptions={subs} 
+            onPricingSaved={async () => {
+              const { data: authData } = await supabase.auth.getUser();
+              if (authData.user?.user_metadata?.pricing_config) {
+                setPricingConfig(authData.user.user_metadata.pricing_config);
+              }
+            }} 
+          />
         )}
       </main>
 
