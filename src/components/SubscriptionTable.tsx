@@ -41,7 +41,20 @@ export default function SubscriptionTable({ subscriptions, onEdit, onDelete, onT
     const phone = sub.clientPhone.replace(/\D/g, '');
     if (!phone) return toast.error("El número de teléfono no es válido.");
     
-    const message = `¡Hola ${sub.clientName}! 👋 Te saludamos de Stream Manager.\n\nQueríamos recordarte amablemente que tu suscripción de ${sub.platform} está próxima a vencer (o ya venció). ¡No pierdas el acceso a tus perfiles, escríbenos para renovarla!`;
+    const nextDate = getNextPaymentDate(sub.purchaseDate);
+    const formattedDate = nextDate.toLocaleDateString('es-CO', { day: 'numeric', month: 'long' });
+
+    const message = `¡Hola, ${sub.clientName}! 👋
+Espero que estés muy bien.
+
+Te recuerdo que tu suscripción de ${sub.platform} vence el ${formattedDate} 📅
+
+Para que no pierdas el acceso al contenido, puedes renovarla desde hoy mismo, con tu misma fecha de corte.
+
+¿Deseas que te envíe los datos de pago para renovar de inmediato? 💳
+
+Quedo pendiente 👍`;
+
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
