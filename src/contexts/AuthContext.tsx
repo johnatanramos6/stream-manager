@@ -6,6 +6,8 @@ interface AuthContextType {
   session: Session | null;
   user: User | null;
   isAdmin: boolean;
+  mustChangePassword: boolean;
+  clearPasswordFlag: () => void;
   signOut: () => Promise<void>;
 }
 
@@ -13,6 +15,8 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   user: null,
   isAdmin: false,
+  mustChangePassword: false,
+  clearPasswordFlag: () => {},
   signOut: async () => {},
 });
 
@@ -20,17 +24,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      setMustChangePassword(session?.user?.user_metadata?.must_change_password === true);
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
+      setMustChangePassword(session?.user?.user_metadata?.must_change_password === true);
     });
 
     return () => subscription.unsubscribe();
@@ -40,6 +47,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  const clearPasswordFlag = () => {
+    setMustChangePassword(false);
+  };
+
   const isAdmin = user?.email?.toLowerCase() === 'johnatanramos6@gmail.com';
 
   if (loading) {
@@ -47,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ session, user, isAdmin, signOut }}>
+    <AuthContext.Provider value={{ session, user, isAdmin, mustChangePassword, clearPasswordFlag, signOut }}>
       {children}
     </AuthContext.Provider>
   );

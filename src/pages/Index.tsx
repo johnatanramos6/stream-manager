@@ -7,6 +7,7 @@ import StatsBar, { QuickFilter } from '@/components/StatsBar';
 import FinanceSection from '@/components/FinanceSection';
 import ThemeToggle from '@/components/ThemeToggle';
 import InstallPWA from '@/components/InstallPWA';
+import ChangePassword from '@/components/ChangePassword';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -777,7 +778,8 @@ function IndexContent() {
 }
 
 export default function Index() {
-  const { session } = useAuth();
+  const { session, mustChangePassword } = useAuth();
   if (!session) return <Login />;
+  if (mustChangePassword) return <ChangePassword />;
   return <IndexContent />;
 }

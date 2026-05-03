@@ -46,7 +46,13 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
     if (password.length < 6) return toast.error("La contraseña provisional debe tener al menos 6 caracteres.");
     
     setCreating(true);
-    const { data, error } = await authClient.auth.signUp({ email, password });
+    const { data, error } = await authClient.auth.signUp({ 
+      email, 
+      password,
+      options: {
+        data: { must_change_password: true }
+      }
+    });
     
     if (error) {
       toast.error('Error al crear vendedor: ' + error.message);
