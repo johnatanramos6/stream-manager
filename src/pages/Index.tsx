@@ -186,7 +186,9 @@ function IndexContent() {
   const [pricingConfig, setPricingConfig] = useState(DEFAULT_PRICING);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const dynamicPlatforms = pricingConfig.map(p => p.platform);
+  const dynamicPlatforms = Array.isArray(pricingConfig) 
+    ? pricingConfig.map(p => p?.platform || '').filter(p => p.trim() !== '')
+    : DEFAULT_PRICING.map(p => p.platform);
 
   useEffect(() => {
     if (!user) return;

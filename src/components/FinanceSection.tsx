@@ -75,6 +75,14 @@ export default function FinanceSection({ subscriptions, onPricingSaved }: Props)
 
   const handleSavePricing = async () => {
     if (!user) return;
+    
+    // Validar que no haya plataformas vacías
+    const hasEmptyPlatforms = pricing.some(p => !p.platform || p.platform.trim() === '');
+    if (hasEmptyPlatforms) {
+      toast.error('No puedes guardar plataformas con nombres vacíos.');
+      return;
+    }
+
     setIsSaving(true);
     // Guardar en user_metadata no requiere SQL y no tiene bloqueos de RLS
     const { error } = await supabase.auth.updateUser({
