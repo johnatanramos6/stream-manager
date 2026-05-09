@@ -10,6 +10,7 @@ import { MasterAccount } from '@/types/masterAccount';
 import ThemeToggle from '@/components/ThemeToggle';
 import InstallPWA from '@/components/InstallPWA';
 import ChangePassword from '@/components/ChangePassword';
+import PasswordNotifierDialog from '@/components/PasswordNotifierDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -187,6 +188,7 @@ function IndexContent() {
   const [showAdmin, setShowAdmin] = useState(false);
   const [pricingConfig, setPricingConfig] = useState(DEFAULT_PRICING);
   const [masterAccounts, setMasterAccounts] = useState<MasterAccount[]>([]);
+  const [notifyState, setNotifyState] = useState<{ open: boolean; clients: Subscription[]; newPassword: string; platform: string }>({ open: false, clients: [], newPassword: '', platform: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const dynamicPlatforms = Array.isArray(pricingConfig) 
@@ -538,11 +540,57 @@ function IndexContent() {
     const { error } = await supabase.from('subscriptions').upsert(payload);
     if (error) return toast.error("Error al guardar en la nube");
 
+    // Lógica para detectar cambio de contraseña
+    let updatedSubs = [...subs];
+    const isPasswordChanged = editing && editing.accountPassword !== sub.accountPassword && sub.accountPassword && sub.accountEmail;
+    
+    if (isPasswordChanged) {
+      // Find affected subscriptions (same platform and email, or same master account)
+      const affectedSubs = subs.filter(s => 
+        (s.platform === sub.platform && s.accountEmail.toLowerCase() === sub.accountEmail.toLowerCase()) ||
+        (sub.master_account_id && s.master_account_id === sub.master_account_id)
+      );
+
+      if (affectedSubs.length > 0) {
+        // Prepare to update them all
+        for (const affected of affectedSubs) {
+           if (affected.id !== sub.id) {
+             await supabase.from('subscriptions').update({ account_password: sub.accountPassword }).eq('id', affected.id);
+           }
+        }
+        
+        // Si pertenece a una cuenta maestra, también actualizamos la contraseña en la tabla master_accounts
+        if (sub.master_account_id) {
+          await supabase.from('master_accounts').update({ account_password: sub.accountPassword }).eq('id', sub.master_account_id);
+          setMasterAccounts(prev => prev.map(ma => ma.id === sub.master_account_id ? { ...ma, account_password: sub.accountPassword! } : ma));
+        }
+
+        // Update local state
+        updatedSubs = updatedSubs.map(s => 
+          affectedSubs.some(a => a.id === s.id) ? { ...s, accountPassword: sub.accountPassword! } : s
+        );
+
+        // Include the current sub in the notification list if it's new/edited and has phone
+        const allAffectedToNotify = updatedSubs.filter(s => affectedSubs.some(a => a.id === s.id) || s.id === sub.id);
+        
+        // Remove duplicates just in case
+        const uniqueToNotify = Array.from(new Map(allAffectedToNotify.map(item => [item.id, item])).values());
+        
+        setNotifyState({
+          open: true,
+          clients: uniqueToNotify,
+          newPassword: sub.accountPassword,
+          platform: sub.platform
+        });
+      }
+    }
+
     setSubs(prev => {
       const exists = prev.find(s => s.id === sub.id);
-      if (exists) return prev.map(s => s.id === sub.id ? sub : s);
-      return [...prev, sub];
+      if (exists) return updatedSubs.map(s => s.id === sub.id ? sub : s);
+      return [...updatedSubs, sub];
     });
+    
     toast.success(editing ? 'Suscripción actualizada' : 'Suscripción agregada');
     setEditing(null);
   };
@@ -751,6 +799,32 @@ function IndexContent() {
             subscriptions={subs}
             dynamicPlatforms={dynamicPlatforms}
             onAccountsChange={setMasterAccounts}
+            onPasswordChanged={async (masterAccountId, newPassword, platform) => {
+              // Buscar todos los clientes asociados a esta cuenta maestra
+              const affectedSubs = subs.filter(s => s.master_account_id === masterAccountId);
+              
+              if (affectedSubs.length > 0) {
+                // Actualizar DB para todas las suscripciones
+                for (const affected of affectedSubs) {
+                  await supabase.from('subscriptions').update({ account_password: newPassword }).eq('id', affected.id);
+                }
+                
+                // Actualizar estado local
+                setSubs(prev => prev.map(s => 
+                  s.master_account_id === masterAccountId ? { ...s, accountPassword: newPassword } : s
+                ));
+                
+                // Remover duplicados
+                const uniqueToNotify = Array.from(new Map(affectedSubs.map(item => [item.id, item])).values());
+                
+                setNotifyState({
+                  open: true,
+                  clients: uniqueToNotify,
+                  newPassword,
+                  platform
+                });
+              }
+            }}
           />
         ) : (
           <FinanceSection 
@@ -803,6 +877,14 @@ function IndexContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <PasswordNotifierDialog
+        open={notifyState.open}
+        onClose={() => setNotifyState(prev => ({ ...prev, open: false }))}
+        clients={notifyState.clients}
+        newPassword={notifyState.newPassword}
+        platform={notifyState.platform}
+      />
 
       <InstallPWA />
     </div>

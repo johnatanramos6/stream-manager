@@ -19,9 +19,10 @@ interface Props {
   subscriptions: Subscription[];
   dynamicPlatforms: string[];
   onAccountsChange: (accounts: MasterAccount[]) => void;
+  onPasswordChanged?: (masterAccountId: string, newPassword: string, platform: string) => void;
 }
 
-export default function AccountsSection({ accounts, subscriptions, dynamicPlatforms, onAccountsChange }: Props) {
+export default function AccountsSection({ accounts, subscriptions, dynamicPlatforms, onAccountsChange, onPasswordChanged }: Props) {
   const { user } = useAuth();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<MasterAccount | null>(null);
@@ -90,6 +91,11 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
       if (error) return toast.error('Error al actualizar: ' + error.message);
       onAccountsChange(accounts.map(a => a.id === editing.id ? { ...a, ...form } : a));
       toast.success('Cuenta actualizada');
+
+      // Si la contraseña cambió, invocar callback para notificar clientes
+      if (editing.account_password !== form.account_password && onPasswordChanged) {
+        onPasswordChanged(editing.id, form.account_password, form.platform);
+      }
     } else {
       // Insert
       const { data, error } = await supabase.from('master_accounts').insert({
