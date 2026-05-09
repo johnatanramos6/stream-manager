@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { formatCOP } from '@/types/platformPricing';
-import { Package, Plus, Pencil, Trash2, Eye, EyeOff, Copy, Check, Search, Mail, Lock, Users, DollarSign } from 'lucide-react';
+import { Package, Plus, Pencil, Trash2, Eye, EyeOff, Copy, Check, Search, Mail, Lock, Users, DollarSign, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Props {
