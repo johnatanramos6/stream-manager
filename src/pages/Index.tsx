@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Plus, Search, Tv, DollarSign, Download, Upload, Filter, X, LogOut } from 'lucide-react';
+import { Plus, Search, Tv, DollarSign, Download, Upload, Filter, X, LogOut, Package } from 'lucide-react';
 import { useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
@@ -221,6 +221,8 @@ function IndexContent() {
       const { data: maData, error: maError } = await supabase.from('master_accounts').select().eq('vendor_id', user.id).order('created_at', { ascending: false });
       if (maData) {
         setMasterAccounts(maData);
+      } else {
+        setMasterAccounts([]);
       }
       if (maError) console.error("Error al cargar cuentas maestras:", maError);
 
