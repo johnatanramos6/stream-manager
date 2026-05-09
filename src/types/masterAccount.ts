@@ -8,6 +8,7 @@ export interface MasterAccount {
   purchase_price: number;
   notes: string;
   created_at: string;
+  purchase_date?: string; // Fecha de compra
   // Calculated (not from DB)
   assigned_profiles?: number;
   available_profiles?: number;

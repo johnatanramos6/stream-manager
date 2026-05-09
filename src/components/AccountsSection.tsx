@@ -33,7 +33,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Form state
-  const emptyForm = { platform: dynamicPlatforms[0] || 'Netflix', account_email: '', account_password: '', total_profiles: 4, purchase_price: 0, notes: '' };
+  const emptyForm = { platform: dynamicPlatforms[0] || 'Netflix', account_email: '', account_password: '', total_profiles: 4, purchase_price: 0, notes: '', purchase_date: new Date().toISOString().split('T')[0] };
   const [form, setForm] = useState(emptyForm);
 
   const getAssignedCount = (accountId: string) => {
@@ -62,6 +62,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
         total_profiles: account.total_profiles,
         purchase_price: account.purchase_price,
         notes: account.notes,
+        purchase_date: account.purchase_date || new Date().toISOString().split('T')[0],
       });
     } else {
       setEditing(null);
@@ -85,6 +86,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
         account_password: form.account_password,
         total_profiles: form.total_profiles,
         purchase_price: form.purchase_price,
+        purchase_date: form.purchase_date,
         notes: form.notes,
       }).eq('id', editing.id);
 
@@ -105,6 +107,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
         account_password: form.account_password,
         total_profiles: form.total_profiles,
         purchase_price: form.purchase_price,
+        purchase_date: form.purchase_date,
         notes: form.notes,
       }).select().single();
 
@@ -251,9 +254,12 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
                 </div>
 
                 {/* Financial info */}
-                <div className="flex justify-between text-[10px] border-t pt-2">
-                  <span className="text-muted-foreground"><DollarSign className="h-3 w-3 inline" /> Costo: <span className="text-foreground font-semibold">{formatCOP(account.purchase_price)}</span></span>
-                  <span className="text-muted-foreground">P/perfil: <span className="text-foreground font-semibold">{formatCOP(costPerProfile)}</span></span>
+                <div className="flex justify-between items-center text-[10px] border-t pt-2 pb-1">
+                  <span className="text-muted-foreground flex items-center gap-1"><DollarSign className="h-3 w-3" /> Costo: <span className="text-foreground font-semibold">{formatCOP(account.purchase_price)}</span></span>
+                  <span className="text-muted-foreground flex items-center gap-1"><CalendarDays className="h-3 w-3" /> Adquisición: <span className="text-foreground font-semibold">{account.purchase_date || 'N/A'}</span></span>
+                </div>
+                <div className="text-[10px] text-right text-muted-foreground pb-2">
+                  P/perfil: <span className="text-foreground font-semibold">{formatCOP(costPerProfile)}</span>
                 </div>
 
                 {/* Notes */}
@@ -313,12 +319,23 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
               </div>
             </div>
 
-            <div className="space-y-1.5 p-3 bg-primary/5 rounded-xl border border-primary/20">
-              <Label className="text-xs font-semibold text-primary">💰 Precio de compra (cuenta completa)</Label>
-              <Input type="number" min={0} value={form.purchase_price} onChange={e => setForm(p => ({ ...p, purchase_price: parseInt(e.target.value) || 0 }))} placeholder="Ej: 40000" />
+            <div className="space-y-3 p-3 bg-primary/5 rounded-xl border border-primary/20">
+              <Label className="text-xs font-semibold text-primary flex items-center gap-1">
+                <CalendarDays className="h-4 w-4" /> Datos de facturación
+              </Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] text-muted-foreground font-semibold">Fecha de adquisición</Label>
+                  <Input type="date" value={form.purchase_date} onChange={e => setForm(p => ({ ...p, purchase_date: e.target.value }))} required />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] text-muted-foreground font-semibold">Costo total de la cuenta</Label>
+                  <Input type="number" min={0} value={form.purchase_price} onChange={e => setForm(p => ({ ...p, purchase_price: parseInt(e.target.value) || 0 }))} placeholder="Ej: 40000" />
+                </div>
+              </div>
               {form.purchase_price > 0 && form.total_profiles > 0 && (
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  Costo por perfil: <span className="font-bold text-foreground">{formatCOP(Math.round(form.purchase_price / form.total_profiles))}</span>
+                <p className="text-[10px] text-muted-foreground border-t border-primary/10 pt-2">
+                  Costo distribuido por perfil: <span className="font-bold text-foreground text-xs">{formatCOP(Math.round(form.purchase_price / form.total_profiles))}</span>
                 </p>
               )}
             </div>
