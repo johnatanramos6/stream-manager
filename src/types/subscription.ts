@@ -15,6 +15,7 @@ export interface Subscription {
   notes: string;
   accountName?: string; // optional grouping label
   salePriceOverride?: number; // Precio de cobro específico acordado (IPTV combos)
+  master_account_id?: string; // Enlace a cuenta maestra de stock
 }
 
 // Array removido ya que ahora se obtiene dinámicamente de Pricing.

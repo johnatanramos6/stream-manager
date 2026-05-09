@@ -1,11 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Subscription, Platform, PaymentStatus } from '@/types/subscription';
+import { MasterAccount } from '@/types/masterAccount';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Package, Pencil } from 'lucide-react';
 
 interface Props {
   open: boolean;
@@ -14,9 +16,10 @@ interface Props {
   initial?: Subscription | null;
   dynamicPlatforms?: string[];
   allSubscriptions?: Subscription[];
+  masterAccounts?: MasterAccount[];
 }
 
-export default function SubscriptionForm({ open, onClose, onSave, initial, dynamicPlatforms = [], allSubscriptions = [] }: Props) {
+export default function SubscriptionForm({ open, onClose, onSave, initial, dynamicPlatforms = [], allSubscriptions = [], masterAccounts = [] }: Props) {
   const empty: Omit<Subscription, 'id'> = {
     platform: 'Netflix',
     accountEmail: '',
@@ -33,6 +36,8 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
   const [form, setForm] = useState<Omit<Subscription, 'id'>>(
     initial ? { ...initial } : empty
   );
+  const [accountMode, setAccountMode] = useState<'manual' | 'stock'>('manual');
+  const [selectedMasterAccountId, setSelectedMasterAccountId] = useState<string>('');
 
   const existingAccounts = useMemo(() => {
     const map = new Map<string, { email: string; password: string; accountName: string }>();
@@ -57,11 +62,30 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
     return suggestions;
   }, [form.platform, existingAccounts]);
 
+  // Get available master accounts for the selected platform
+  const availableMasterAccounts = useMemo(() => {
+    return masterAccounts.filter(ma => {
+      if (ma.platform !== form.platform) return false;
+      const assignedCount = allSubscriptions.filter(s => (s as any).master_account_id === ma.id).length;
+      return assignedCount < ma.total_profiles;
+    }).map(ma => {
+      const assignedCount = allSubscriptions.filter(s => (s as any).master_account_id === ma.id).length;
+      return { ...ma, assigned: assignedCount, available: ma.total_profiles - assignedCount };
+    });
+  }, [masterAccounts, form.platform, allSubscriptions, open]);
+
   useEffect(() => {
     if (open) {
       setForm(initial ? { ...initial } : empty);
+      setAccountMode(initial && (initial as any).master_account_id ? 'stock' : 'manual');
+      setSelectedMasterAccountId(initial ? (initial as any).master_account_id || '' : '');
     }
   }, [open, initial]);
+
+  // When platform changes, reset stock selection
+  useEffect(() => {
+    setSelectedMasterAccountId('');
+  }, [form.platform]);
 
   const handleEmailChange = (email: string) => {
     setForm(prev => {
@@ -74,17 +98,40 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
     });
   };
 
+  const handleSelectMasterAccount = (accountId: string) => {
+    setSelectedMasterAccountId(accountId);
+    const ma = masterAccounts.find(m => m.id === accountId);
+    if (ma) {
+      setForm(prev => ({
+        ...prev,
+        accountEmail: ma.account_email,
+        accountPassword: ma.account_password,
+        accountName: `${ma.platform} - ${ma.account_email.split('@')[0]}`,
+      }));
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({
+    const sub: any = {
       ...form,
       id: initial?.id || crypto.randomUUID(),
-    });
+    };
+    if (accountMode === 'stock' && selectedMasterAccountId) {
+      sub.master_account_id = selectedMasterAccountId;
+    } else {
+      sub.master_account_id = null;
+    }
+    onSave(sub);
     setForm(empty);
+    setAccountMode('manual');
+    setSelectedMasterAccountId('');
     onClose();
   };
 
   const set = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
+
+  const hasMasterAccounts = masterAccounts.some(ma => ma.platform === form.platform);
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
@@ -109,29 +156,77 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Correo de cuenta</Label>
-              <Input
-                value={form.accountEmail}
-                onChange={e => handleEmailChange(e.target.value)}
-                placeholder="correo@ejemplo.com"
-                list="email-suggestions"
-              />
-              {emailSuggestions.length > 0 && (
-                <datalist id="email-suggestions">
-                  {emailSuggestions.map((s, i) => <option key={i} value={s.email} />)}
-                </datalist>
+          {/* Account Mode Toggle - Only show if there are master accounts for this platform */}
+          {hasMasterAccounts && (
+            <div className="flex gap-2 p-1 bg-muted rounded-lg">
+              <button
+                type="button"
+                onClick={() => { setAccountMode('manual'); setSelectedMasterAccountId(''); }}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-md transition-all ${accountMode === 'manual' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}
+              >
+                <Pencil className="h-3 w-3" /> Manual
+              </button>
+              <button
+                type="button"
+                onClick={() => setAccountMode('stock')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-md transition-all ${accountMode === 'stock' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}
+              >
+                <Package className="h-3 w-3" /> Desde Stock ({availableMasterAccounts.length})
+              </button>
+            </div>
+          )}
+
+          {accountMode === 'stock' ? (
+            /* Stock Mode */
+            <div className="space-y-3 p-3 bg-primary/5 rounded-xl border border-primary/20">
+              <Label className="text-xs font-semibold text-primary">📦 Seleccionar cuenta del inventario</Label>
+              {availableMasterAccounts.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No hay cuentas de {form.platform} con perfiles disponibles.</p>
+              ) : (
+                <Select value={selectedMasterAccountId} onValueChange={handleSelectMasterAccount}>
+                  <SelectTrigger><SelectValue placeholder="Elegir cuenta..." /></SelectTrigger>
+                  <SelectContent>
+                    {availableMasterAccounts.map(ma => (
+                      <SelectItem key={ma.id} value={ma.id}>
+                        {ma.account_email} ({ma.available} de {ma.total_profiles} libres)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
-              {emailSuggestions.length > 0 && !form.accountEmail && (
-                <p className="text-[10px] text-muted-foreground">💡 Correos existentes disponibles</p>
+              {selectedMasterAccountId && (
+                <div className="text-[10px] text-muted-foreground space-y-0.5">
+                  <p>📧 {form.accountEmail}</p>
+                  <p>🔒 Contraseña asignada automáticamente</p>
+                </div>
               )}
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Contraseña</Label>
-              <Input value={form.accountPassword} onChange={e => set('accountPassword', e.target.value)} placeholder="Contraseña" />
+          ) : (
+            /* Manual Mode */
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Correo de cuenta</Label>
+                <Input
+                  value={form.accountEmail}
+                  onChange={e => handleEmailChange(e.target.value)}
+                  placeholder="correo@ejemplo.com"
+                  list="email-suggestions"
+                />
+                {emailSuggestions.length > 0 && (
+                  <datalist id="email-suggestions">
+                    {emailSuggestions.map((s, i) => <option key={i} value={s.email} />)}
+                  </datalist>
+                )}
+                {emailSuggestions.length > 0 && !form.accountEmail && (
+                  <p className="text-[10px] text-muted-foreground">💡 Correos existentes disponibles</p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Contraseña</Label>
+                <Input value={form.accountPassword} onChange={e => set('accountPassword', e.target.value)} placeholder="Contraseña" />
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold">Teléfono / WhatsApp (opcional)</Label>

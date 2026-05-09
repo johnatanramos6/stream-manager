@@ -5,6 +5,8 @@ import SubscriptionForm from '@/components/SubscriptionForm';
 import SubscriptionTable from '@/components/SubscriptionTable';
 import StatsBar, { QuickFilter } from '@/components/StatsBar';
 import FinanceSection from '@/components/FinanceSection';
+import AccountsSection from '@/components/AccountsSection';
+import { MasterAccount } from '@/types/masterAccount';
 import ThemeToggle from '@/components/ThemeToggle';
 import InstallPWA from '@/components/InstallPWA';
 import ChangePassword from '@/components/ChangePassword';
@@ -178,12 +180,13 @@ function IndexContent() {
   const [search, setSearch] = useState('');
   const [filterPlatform, setFilterPlatform] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<'clients' | 'finance'>('clients');
+  const [activeTab, setActiveTab] = useState<'clients' | 'accounts' | 'finance'>('clients');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
   const [showAdmin, setShowAdmin] = useState(false);
   const [pricingConfig, setPricingConfig] = useState(DEFAULT_PRICING);
+  const [masterAccounts, setMasterAccounts] = useState<MasterAccount[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const dynamicPlatforms = Array.isArray(pricingConfig) 
@@ -208,10 +211,18 @@ function IndexContent() {
           paymentStatus: d.payment_status,
           notes: d.notes,
           accountName: d.account_name,
-          salePriceOverride: d.sale_price_override
+          salePriceOverride: d.sale_price_override,
+          master_account_id: d.master_account_id
         })));
       }
       if (error) toast.error("Error al cargar las suscripciones.");
+
+      // Cargar cuentas maestras
+      const { data: maData, error: maError } = await supabase.from('master_accounts').select().eq('vendor_id', user.id).order('created_at', { ascending: false });
+      if (maData) {
+        setMasterAccounts(maData);
+      }
+      if (maError) console.error("Error al cargar cuentas maestras:", maError);
 
       // Cargar configuración de precios desde Supabase Auth Metadata (Sin necesidad de SQL)
       const { data: authData } = await supabase.auth.getUser();
@@ -518,7 +529,8 @@ function IndexContent() {
       payment_status: sub.paymentStatus,
       notes: sub.notes,
       account_name: sub.accountName,
-      sale_price_override: sub.salePriceOverride
+      sale_price_override: sub.salePriceOverride,
+      master_account_id: sub.master_account_id || null
     };
 
     const { error } = await supabase.from('subscriptions').upsert(payload);
@@ -610,6 +622,13 @@ function IndexContent() {
               >
                 <Tv className="h-3.5 w-3.5 inline mr-1" />
                 <span className="hidden sm:inline">Clientes</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('accounts')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${activeTab === 'accounts' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                <Package className="h-3.5 w-3.5 inline mr-1" />
+                <span className="hidden sm:inline">Cuentas</span>
               </button>
               <button
                 onClick={() => setActiveTab('finance')}
@@ -724,6 +743,13 @@ function IndexContent() {
               onTogglePayment={handleTogglePayment}
             />
           </>
+        ) : activeTab === 'accounts' ? (
+          <AccountsSection
+            accounts={masterAccounts}
+            subscriptions={subs}
+            dynamicPlatforms={dynamicPlatforms}
+            onAccountsChange={setMasterAccounts}
+          />
         ) : (
           <FinanceSection 
             subscriptions={subs} 
@@ -754,6 +780,7 @@ function IndexContent() {
         initial={editing}
         dynamicPlatforms={dynamicPlatforms}
         allSubscriptions={subs}
+        masterAccounts={masterAccounts}
       />
 
       {/* ── Delete Confirmation ── */}
