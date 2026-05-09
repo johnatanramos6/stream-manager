@@ -8,9 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { DollarSign, TrendingUp, TrendingDown, Users, Monitor, Save, AlertCircle, Plus, X, ChevronLeft, ChevronRight, CalendarDays, Loader2 } from 'lucide-react';
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
+import { MasterAccount } from '@/types/masterAccount';
 
 interface Props {
   subscriptions: Subscription[];
+  masterAccounts: MasterAccount[];
   onPricingSaved?: () => void;
 }
 
@@ -41,7 +43,7 @@ const getPlatformBrandColor = (name: string) => {
 const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 const MONTH_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
-export default function FinanceSection({ subscriptions, onPricingSaved }: Props) {
+export default function FinanceSection({ subscriptions, masterAccounts, onPricingSaved }: Props) {
   const { user } = useAuth();
   const [pricing, setPricing] = useState<PlatformPricing[]>(DEFAULT_PRICING);
   const [editing, setEditing] = useState(false);
@@ -102,6 +104,7 @@ export default function FinanceSection({ subscriptions, onPricingSaved }: Props)
 
   const stats = useMemo(() => {
     const pricingMap = new Map(pricing.map(p => [p.platform, p]));
+    const masterAccountsMap = new Map(masterAccounts.map(ma => [ma.id, ma]));
 
     const platformStatsMap = new Map<string, { accounts: number; clients: number; revenue: number; cost: number; profit: number; marginPercent: number }>();
     const uniqueAccounts = new Set<string>();
@@ -109,7 +112,7 @@ export default function FinanceSection({ subscriptions, onPricingSaved }: Props)
     subscriptions.forEach(sub => {
       const p = pricingMap.get(sub.platform);
       
-      // Calculate revenue (using override if provided for IPTV combinations or individual deals)
+      // Calculate revenue
       const salePrice = p ? p.salePrice : 0;
       const actualRevenue = sub.salePriceOverride ?? salePrice;
 
@@ -122,11 +125,31 @@ export default function FinanceSection({ subscriptions, onPricingSaved }: Props)
         ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}`
         : `ungrouped::${sub.id}`;
 
-      if (!uniqueAccounts.has(key)) {
+      const isNewAccount = !uniqueAccounts.has(key);
+      if (isNewAccount) {
         uniqueAccounts.add(key);
         ps.accounts++;
       }
 
+      let costForThisSub = 0;
+      if (sub.master_account_id) {
+        const ma = masterAccountsMap.get(sub.master_account_id);
+        if (ma && ma.total_profiles > 0) {
+          costForThisSub = ma.purchase_price / ma.total_profiles;
+        }
+      } else {
+        const pConf = pricingMap.get(sub.platform) || { costPrice: 0, salePrice: 0, costType: sub.platform === 'IPTV Premium' ? 'per_account' : 'per_screen' };
+        const cType = (pConf as any).costType || (sub.platform === 'IPTV Premium' ? 'per_account' : 'per_screen');
+        if (cType === 'per_account') {
+          if (isNewAccount) {
+            costForThisSub = pConf.costPrice;
+          }
+        } else {
+          costForThisSub = pConf.costPrice;
+        }
+      }
+
+      ps.cost += costForThisSub;
       platformStatsMap.set(sub.platform, ps);
     });
 
@@ -135,12 +158,6 @@ export default function FinanceSection({ subscriptions, onPricingSaved }: Props)
     const platformStats: { platform: string; accounts: number; clients: number; cost: number; revenue: number; profit: number; marginPercent: number }[] = [];
 
     platformStatsMap.forEach((ps, platform) => {
-      // @ts-ignore - backward compatibility for items missing costType
-      const p = pricingMap.get(platform) || { costPrice: 0, salePrice: 0, costType: platform === 'IPTV Premium' ? 'per_account' : 'per_screen' };
-      const cType = (p as any).costType || (platform === 'IPTV Premium' ? 'per_account' : 'per_screen');
-
-      // Si es de tipo cuenta, el costo se multiplica por las cuentas únicas. Si es por pantalla, se multiplica por cuántos clientes hay.
-      ps.cost = cType === 'per_account' ? (ps.accounts * p.costPrice) : (ps.clients * p.costPrice);
       ps.profit = ps.revenue - ps.cost;
       ps.marginPercent = ps.revenue > 0 ? (ps.profit / ps.revenue) * 100 : 0;
 
@@ -179,6 +196,7 @@ export default function FinanceSection({ subscriptions, onPricingSaved }: Props)
 
   const monthlyData = useMemo(() => {
     const pricingMap = new Map(pricing.map(p => [p.platform, p]));
+    const masterAccountsMap = new Map(masterAccounts.map(ma => [ma.id, ma]));
     const months: { month: string; monthFull: string; Ingresos: number | null; Costos: number | null; Ganancia: number | null; IngresosProj: number | null; CostosProj: number | null; GananciaProj: number | null; clients: number; isFuture: boolean }[] = [];
 
     for (let m = 0; m < 12; m++) {
@@ -204,15 +222,28 @@ export default function FinanceSection({ subscriptions, onPricingSaved }: Props)
           ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}`
           : `ungrouped::${sub.id}`;
 
-        const cType = (p as any)?.costType || 'per_screen';
-        if (cType === 'per_account') {
-          if (!uniqueAccounts.has(key)) {
-            uniqueAccounts.add(key);
-            cost += p?.costPrice || 0;
+        const isNewAccount = !uniqueAccounts.has(key);
+        if (isNewAccount) {
+          uniqueAccounts.add(key);
+        }
+
+        let costForThisSub = 0;
+        if (sub.master_account_id) {
+          const ma = masterAccountsMap.get(sub.master_account_id);
+          if (ma && ma.total_profiles > 0) {
+            costForThisSub = ma.purchase_price / ma.total_profiles;
           }
         } else {
-          cost += p?.costPrice || 0;
+          const cType = (p as any)?.costType || 'per_screen';
+          if (cType === 'per_account') {
+            if (isNewAccount) {
+              costForThisSub = p?.costPrice || 0;
+            }
+          } else {
+            costForThisSub = p?.costPrice || 0;
+          }
         }
+        cost += costForThisSub;
       });
 
       months.push({

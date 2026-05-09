@@ -755,6 +755,7 @@ function IndexContent() {
         ) : (
           <FinanceSection 
             subscriptions={subs} 
+            masterAccounts={masterAccounts}
             onPricingSaved={async () => {
               const { data: authData } = await supabase.auth.getUser();
               if (authData.user?.user_metadata?.pricing_config) {
