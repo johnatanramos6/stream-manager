@@ -10,6 +10,7 @@ export interface MasterAccount {
   created_at: string;
   purchase_date?: string; // Fecha de compra
   supplier_phone?: string; // Teléfono/WhatsApp del proveedor
+  supplier_name?: string; // Nombre del proveedor
   // Calculated (not from DB)
   assigned_profiles?: number;
   available_profiles?: number;

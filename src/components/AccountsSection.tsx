@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { formatCOP } from '@/types/platformPricing';
-import { Package, Plus, Pencil, Trash2, Eye, EyeOff, Copy, Check, Search, Mail, Lock, Users, DollarSign, CalendarDays, Phone, MessageCircle, RefreshCw, Wrench } from 'lucide-react';
+import { Package, Plus, Pencil, Trash2, Eye, EyeOff, Copy, Check, Search, Mail, Lock, Users, DollarSign, CalendarDays, Phone, MessageCircle, RefreshCw, Wrench, User } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Props {
@@ -33,7 +33,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Form state
-  const emptyForm = { platform: dynamicPlatforms[0] || 'Netflix', account_email: '', account_password: '', total_profiles: 4, purchase_price: 0, notes: '', purchase_date: new Date().toISOString().split('T')[0], supplier_phone: '' };
+  const emptyForm = { platform: dynamicPlatforms[0] || 'Netflix', account_email: '', account_password: '', total_profiles: 4, purchase_price: 0, notes: '', purchase_date: new Date().toISOString().split('T')[0], supplier_phone: '', supplier_name: '' };
   const [form, setForm] = useState(emptyForm);
 
   const getAssignedCount = (accountId: string) => {
@@ -64,6 +64,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
         notes: account.notes,
         purchase_date: account.purchase_date || new Date().toISOString().split('T')[0],
         supplier_phone: account.supplier_phone || '',
+        supplier_name: account.supplier_name || '',
       });
     } else {
       setEditing(null);
@@ -89,6 +90,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
         purchase_price: form.purchase_price,
         purchase_date: form.purchase_date,
         supplier_phone: form.supplier_phone || null,
+        supplier_name: form.supplier_name || null,
         notes: form.notes,
       }).eq('id', editing.id);
 
@@ -111,6 +113,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
         purchase_price: form.purchase_price,
         purchase_date: form.purchase_date,
         supplier_phone: form.supplier_phone || null,
+        supplier_name: form.supplier_name || null,
         notes: form.notes,
       }).select().single();
 
@@ -265,10 +268,12 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
                   P/perfil: <span className="text-foreground font-semibold">{formatCOP(costPerProfile)}</span>
                 </div>
 
-                {/* Supplier phone */}
-                {account.supplier_phone && (
-                  <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                    <Phone className="h-3 w-3" /> Proveedor: <span className="text-foreground font-semibold">{account.supplier_phone}</span>
+                {/* Supplier info */}
+                {(account.supplier_name || account.supplier_phone) && (
+                  <div className="text-[10px] text-muted-foreground flex items-center gap-1 flex-wrap">
+                    {account.supplier_name && <><User className="h-3 w-3" /> <span className="text-foreground font-semibold">{account.supplier_name}</span></>}
+                    {account.supplier_name && account.supplier_phone && <span className="mx-1">|</span>}
+                    {account.supplier_phone && <><Phone className="h-3 w-3" /> <span className="text-foreground font-semibold">{account.supplier_phone}</span></>}
                   </div>
                 )}
 
@@ -282,15 +287,23 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
                   <div className="flex gap-1.5 pt-1">
                     <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] text-green-600 hover:bg-green-600/10 border-green-600/30" onClick={() => {
                       const phone = account.supplier_phone!.replace(/\D/g, '');
-                      const msg = `Hola, te escribo para *renovar* la cuenta de *${account.platform}* (${account.account_email}). La fecha de adquisición fue ${account.purchase_date || 'N/A'}. ¿Cuál es el precio de renovación?`;
-                      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+                      const provName = account.supplier_name || 'Proveedor';
+                      const purchaseD = new Date((account.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
+                      const cutoff = new Date(purchaseD); cutoff.setDate(cutoff.getDate() + 30);
+                      const fmtDate = (d: Date) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
+                      const msg = `Hola\u00A1 ${provName} le escribo por el siguiente servicio de ${account.platform}\n\n\uD83D\uDCE7 Correo: ${account.account_email}\n\uD83D\uDD11 Contrase\u00F1a: ${account.account_password}\n\uD83D\uDDD3\uFE0F Fecha de inicio: ${fmtDate(purchaseD)}\n\u2622\uFE0F Fecha de fin: ${fmtDate(cutoff)}\n\nSolicito renovacion del servicio.`;
+                      window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`, '_blank');
                     }}>
                       <RefreshCw className="h-3 w-3 mr-1" /> Renovar
                     </Button>
                     <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] text-amber-600 hover:bg-amber-600/10 border-amber-600/30" onClick={() => {
                       const phone = account.supplier_phone!.replace(/\D/g, '');
-                      const msg = `Hola, necesito *soporte técnico* con la cuenta de *${account.platform}* (${account.account_email}). Tengo un inconveniente y necesito tu ayuda.`;
-                      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+                      const provName = account.supplier_name || 'Proveedor';
+                      const purchaseD = new Date((account.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
+                      const cutoff = new Date(purchaseD); cutoff.setDate(cutoff.getDate() + 30);
+                      const fmtDate = (d: Date) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
+                      const msg = `Hola\u00A1 ${provName} le escribo por el siguiente servicio de ${account.platform}\n\n\uD83D\uDCE7 Correo: ${account.account_email}\n\uD83D\uDD11 Contrase\u00F1a: ${account.account_password}\n\uD83D\uDDD3\uFE0F Fecha de inicio: ${fmtDate(purchaseD)}\n\u2622\uFE0F Fecha de fin: ${fmtDate(cutoff)}\n\nSolicito soporte ante un inconveniente con el servicio.`;
+                      window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`, '_blank');
                     }}>
                       <Wrench className="h-3 w-3 mr-1" /> Soporte
                     </Button>
@@ -370,10 +383,21 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
               )}
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> Teléfono / WhatsApp del proveedor (opcional)</Label>
-              <Input value={form.supplier_phone} onChange={e => setForm(p => ({ ...p, supplier_phone: e.target.value }))} placeholder="Ej: 573001234567" />
-              <p className="text-[10px] text-muted-foreground">Incluir código de país sin +. Se habilitarán botones de Renovar y Soporte técnico.</p>
+            <div className="space-y-3 p-3 bg-green-500/5 rounded-xl border border-green-500/20">
+              <Label className="text-xs font-semibold text-green-600 flex items-center gap-1">
+                <User className="h-4 w-4" /> Datos del proveedor (opcional)
+              </Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] text-muted-foreground font-semibold">Nombre del proveedor</Label>
+                  <Input value={form.supplier_name} onChange={e => setForm(p => ({ ...p, supplier_name: e.target.value }))} placeholder="Ej: Carlos, Tienda X..." />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] text-muted-foreground font-semibold">Teléfono / WhatsApp</Label>
+                  <Input value={form.supplier_phone} onChange={e => setForm(p => ({ ...p, supplier_phone: e.target.value }))} placeholder="Ej: 573001234567" />
+                </div>
+              </div>
+              <p className="text-[10px] text-muted-foreground">Se habilitarán botones de Renovar y Soporte técnico en la tarjeta.</p>
             </div>
 
             <div className="space-y-1.5">
