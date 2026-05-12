@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Subscription, getNextPaymentDate } from '@/types/subscription';
+import { Subscription } from '@/types/subscription';
 import { MessageCircle, Send, Copy, Check } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
@@ -26,7 +26,9 @@ export default function WelcomeWhatsAppDialog({ open, onClose, subscription }: P
   const message = useMemo(() => {
     if (!subscription) return '';
     
-    const cutoffDate = getNextPaymentDate(subscription.purchaseDate);
+    const purchaseD = new Date(subscription.purchaseDate + 'T12:00:00');
+    const cutoffDate = new Date(purchaseD);
+    cutoffDate.setDate(cutoffDate.getDate() + 30);
     const cutoffStr = `${cutoffDate.getDate().toString().padStart(2, '0')}/${(cutoffDate.getMonth() + 1).toString().padStart(2, '0')}/${cutoffDate.getFullYear()}`;
 
     return `🎬 SERVICIO DE STREAMING ACTIVADO ✅
