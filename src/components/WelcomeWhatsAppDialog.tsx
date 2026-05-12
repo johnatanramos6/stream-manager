@@ -31,42 +31,40 @@ export default function WelcomeWhatsAppDialog({ open, onClose, subscription }: P
     cutoffDate.setDate(cutoffDate.getDate() + 30);
     const cutoffStr = `${cutoffDate.getDate().toString().padStart(2, '0')}/${(cutoffDate.getMonth() + 1).toString().padStart(2, '0')}/${cutoffDate.getFullYear()}`;
 
-    return `🎬 SERVICIO DE STREAMING ACTIVADO ✅
+    const lines = [
+      '\uD83C\uDFAC SERVICIO DE STREAMING ACTIVADO \u2705',
+      `Hola, ${subscription.clientName}. A continuaci\u00F3n encontrar\u00E1s tus datos de acceso:`,
+      '',
+      `\uD83D\uDCCC Plataforma: ${subscription.platform}`,
+      `\uD83D\uDCE7 Correo: ${subscription.accountEmail}`,
+      `\uD83D\uDD10 Contrase\u00F1a: ${subscription.accountPassword}`,
+      `\uD83D\uDC64 Perfil asignado: ${subscription.accountName || 'N/A'}`,
+      `\uD83D\uDD22 PIN del perfil: ${subscription.profilePin || 'N/A'}`,
+      '',
+      `\uD83D\uDCC5 Fecha de inicio: ${formatDateES(subscription.purchaseDate)}`,
+      `\u23F3 Fecha de corte: ${cutoffStr}`,
+      '',
+      '\u26A0\uFE0F Recomendaciones importantes:',
+      '\u2022 Ingresa \u00FAnicamente al perfil asignado.',
+      '\u2022 No cambies el correo, contrase\u00F1a, perfil ni PIN.',
+      '\u2022 No compartas los datos de acceso con terceros.',
+      '\u2022 Si tienes alg\u00FAn inconveniente, escr\u00EDbenos para ayudarte.',
+      '',
+      '\u2705 Gracias por confiar en nosotros.',
+      '\uD83C\uDF7F \u00A1Disfruta tu contenido!'
+    ];
 
-Hola, ${subscription.clientName} gracias por tu compra. A continuación encontrarás tus datos de acceso:
-
-📌 Plataforma: ${subscription.platform}
-
-📧 Correo: ${subscription.accountEmail}
-🔐 Contraseña: ${subscription.accountPassword}
-
-👤 Perfil asignado: ${subscription.accountName || 'N/A'}
-🔢 PIN del perfil: ${subscription.profilePin || 'N/A'}
-
-📅 Fecha de inicio: ${formatDateES(subscription.purchaseDate)}
-⏳ Fecha de corte: ${cutoffStr}
-
-⚠️ Recomendaciones importantes:
-
-• Ingresa únicamente al perfil asignado.
-
-• No cambies el correo, contraseña, perfil ni PIN.
-
-• No compartas los datos de acceso con terceros.
-
-• Si tienes algún inconveniente, escríbenos para ayudarte.
-
-✅ Gracias por confiar en nosotros.
-🍿 ¡Disfruta tu contenido!`;
+    return lines.join('\n');
   }, [subscription]);
 
   const handleSendWhatsApp = () => {
     if (!subscription?.clientPhone) {
-      toast.error('Este cliente no tiene número de teléfono registrado.');
+      toast.error('Este cliente no tiene n\u00FAmero de tel\u00E9fono registrado.');
       return;
     }
     const phone = subscription.clientPhone.replace(/\D/g, '');
-    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    // Usar api.whatsapp.com para mejor compatibilidad con emojis en PC
+    const url = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
     toast.success('WhatsApp abierto');
   };
@@ -91,7 +89,7 @@ Hola, ${subscription.clientName} gracias por tu compra. A continuación encontra
             Enviar datos al cliente
           </DialogTitle>
           <DialogDescription>
-            Envía los datos de acceso de <strong>{subscription.clientName}</strong> por WhatsApp o copia el mensaje.
+            Env&iacute;a los datos de acceso de <strong>{subscription.clientName}</strong> por WhatsApp o copia el mensaje.
           </DialogDescription>
         </DialogHeader>
 
@@ -100,8 +98,8 @@ Hola, ${subscription.clientName} gracias por tu compra. A continuación encontra
           <Textarea
             value={message}
             readOnly
-            rows={16}
-            className="text-xs leading-relaxed bg-muted/50 border-muted resize-none font-mono"
+            rows={18}
+            className="text-xs leading-relaxed bg-muted/50 border-muted resize-none"
           />
 
           {/* Actions */}
@@ -112,7 +110,7 @@ Hola, ${subscription.clientName} gracias por tu compra. A continuación encontra
               className="flex-1 bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-600/20"
             >
               <Send className="h-4 w-4 mr-2" />
-              {hasPhone ? 'Enviar por WhatsApp' : 'Sin número de teléfono'}
+              {hasPhone ? 'Enviar por WhatsApp' : 'Sin n\u00FAmero de tel\u00E9fono'}
             </Button>
             <Button variant="outline" onClick={handleCopy} className="shrink-0">
               {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
@@ -127,3 +125,4 @@ Hola, ${subscription.clientName} gracias por tu compra. A continuación encontra
     </Dialog>
   );
 }
+
