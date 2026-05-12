@@ -37,9 +37,11 @@ export function getPlatformClass(platform: Platform): string {
 export function getNextPaymentDate(purchaseDate: string): Date {
   const purchase = new Date(purchaseDate + 'T12:00:00');
   const now = new Date();
+  now.setHours(0, 0, 0, 0);
   const next = new Date(purchase);
+  next.setHours(0, 0, 0, 0);
   
-  // Move forward month by month until we pass today
+  // Move forward month by month until we PASS today (strictly future)
   while (next <= now) {
     next.setMonth(next.getMonth() + 1);
   }
