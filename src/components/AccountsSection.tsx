@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { formatCOP } from '@/types/platformPricing';
-import { Package, Plus, Pencil, Trash2, Eye, EyeOff, Copy, Check, Search, Mail, Lock, Users, DollarSign, CalendarDays } from 'lucide-react';
+import { Package, Plus, Pencil, Trash2, Eye, EyeOff, Copy, Check, Search, Mail, Lock, Users, DollarSign, CalendarDays, Phone, MessageCircle, RefreshCw, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Props {
@@ -33,7 +33,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Form state
-  const emptyForm = { platform: dynamicPlatforms[0] || 'Netflix', account_email: '', account_password: '', total_profiles: 4, purchase_price: 0, notes: '', purchase_date: new Date().toISOString().split('T')[0] };
+  const emptyForm = { platform: dynamicPlatforms[0] || 'Netflix', account_email: '', account_password: '', total_profiles: 4, purchase_price: 0, notes: '', purchase_date: new Date().toISOString().split('T')[0], supplier_phone: '' };
   const [form, setForm] = useState(emptyForm);
 
   const getAssignedCount = (accountId: string) => {
@@ -63,6 +63,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
         purchase_price: account.purchase_price,
         notes: account.notes,
         purchase_date: account.purchase_date || new Date().toISOString().split('T')[0],
+        supplier_phone: account.supplier_phone || '',
       });
     } else {
       setEditing(null);
@@ -87,6 +88,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
         total_profiles: form.total_profiles,
         purchase_price: form.purchase_price,
         purchase_date: form.purchase_date,
+        supplier_phone: form.supplier_phone || null,
         notes: form.notes,
       }).eq('id', editing.id);
 
@@ -108,6 +110,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
         total_profiles: form.total_profiles,
         purchase_price: form.purchase_price,
         purchase_date: form.purchase_date,
+        supplier_phone: form.supplier_phone || null,
         notes: form.notes,
       }).select().single();
 
@@ -262,9 +265,36 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
                   P/perfil: <span className="text-foreground font-semibold">{formatCOP(costPerProfile)}</span>
                 </div>
 
+                {/* Supplier phone */}
+                {account.supplier_phone && (
+                  <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <Phone className="h-3 w-3" /> Proveedor: <span className="text-foreground font-semibold">{account.supplier_phone}</span>
+                  </div>
+                )}
+
                 {/* Notes */}
                 {account.notes && (
                   <p className="text-[10px] text-muted-foreground italic truncate">📝 {account.notes}</p>
+                )}
+
+                {/* WhatsApp supplier actions */}
+                {account.supplier_phone && (
+                  <div className="flex gap-1.5 pt-1">
+                    <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] text-green-600 hover:bg-green-600/10 border-green-600/30" onClick={() => {
+                      const phone = account.supplier_phone!.replace(/\D/g, '');
+                      const msg = `Hola, te escribo para *renovar* la cuenta de *${account.platform}* (${account.account_email}). La fecha de adquisición fue ${account.purchase_date || 'N/A'}. ¿Cuál es el precio de renovación?`;
+                      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+                    }}>
+                      <RefreshCw className="h-3 w-3 mr-1" /> Renovar
+                    </Button>
+                    <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] text-amber-600 hover:bg-amber-600/10 border-amber-600/30" onClick={() => {
+                      const phone = account.supplier_phone!.replace(/\D/g, '');
+                      const msg = `Hola, necesito *soporte técnico* con la cuenta de *${account.platform}* (${account.account_email}). Tengo un inconveniente y necesito tu ayuda.`;
+                      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+                    }}>
+                      <Wrench className="h-3 w-3 mr-1" /> Soporte
+                    </Button>
+                  </div>
                 )}
 
                 {/* Actions */}
@@ -338,6 +368,12 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
                   Costo distribuido por perfil: <span className="font-bold text-foreground text-xs">{formatCOP(Math.round(form.purchase_price / form.total_profiles))}</span>
                 </p>
               )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> Teléfono / WhatsApp del proveedor (opcional)</Label>
+              <Input value={form.supplier_phone} onChange={e => setForm(p => ({ ...p, supplier_phone: e.target.value }))} placeholder="Ej: 573001234567" />
+              <p className="text-[10px] text-muted-foreground">Incluir código de país sin +. Se habilitarán botones de Renovar y Soporte técnico.</p>
             </div>
 
             <div className="space-y-1.5">
