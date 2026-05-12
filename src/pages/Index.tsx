@@ -11,6 +11,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 import InstallPWA from '@/components/InstallPWA';
 import ChangePassword from '@/components/ChangePassword';
 import PasswordNotifierDialog from '@/components/PasswordNotifierDialog';
+import WelcomeWhatsAppDialog from '@/components/WelcomeWhatsAppDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -189,6 +190,7 @@ function IndexContent() {
   const [pricingConfig, setPricingConfig] = useState(DEFAULT_PRICING);
   const [masterAccounts, setMasterAccounts] = useState<MasterAccount[]>([]);
   const [notifyState, setNotifyState] = useState<{ open: boolean; clients: Subscription[]; newPassword: string; platform: string }>({ open: false, clients: [], newPassword: '', platform: '' });
+  const [welcomeSub, setWelcomeSub] = useState<Subscription | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const dynamicPlatforms = Array.isArray(pricingConfig) 
@@ -585,14 +587,21 @@ function IndexContent() {
       }
     }
 
+    const isNew = !editing;
+
     setSubs(prev => {
       const exists = prev.find(s => s.id === sub.id);
       if (exists) return updatedSubs.map(s => s.id === sub.id ? sub : s);
       return [...updatedSubs, sub];
     });
     
-    toast.success(editing ? 'Suscripción actualizada' : 'Suscripción agregada');
+    toast.success(isNew ? 'Suscripción agregada' : 'Suscripción actualizada');
     setEditing(null);
+
+    // Mostrar opción de enviar datos por WhatsApp al crear una nueva suscripción
+    if (isNew) {
+      setWelcomeSub(sub);
+    }
   };
 
   const handleEdit = (sub: Subscription) => {
@@ -884,6 +893,12 @@ function IndexContent() {
         clients={notifyState.clients}
         newPassword={notifyState.newPassword}
         platform={notifyState.platform}
+      />
+
+      <WelcomeWhatsAppDialog
+        open={!!welcomeSub}
+        onClose={() => setWelcomeSub(null)}
+        subscription={welcomeSub}
       />
 
       <InstallPWA />
