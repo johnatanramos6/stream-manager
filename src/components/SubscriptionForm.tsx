@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Package, Pencil } from 'lucide-react';
+import { Package, Pencil, Users } from 'lucide-react';
 
 interface Props {
   open: boolean;
@@ -38,6 +38,7 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
   );
   const [accountMode, setAccountMode] = useState<'manual' | 'stock'>('manual');
   const [selectedMasterAccountId, setSelectedMasterAccountId] = useState<string>('');
+  const [sellFullAccount, setSellFullAccount] = useState(false);
 
   const existingAccounts = useMemo(() => {
     const map = new Map<string, { email: string; password: string; accountName: string }>();
@@ -79,6 +80,7 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
       setForm(initial ? { ...initial } : empty);
       setAccountMode(initial && (initial as any).master_account_id ? 'stock' : 'manual');
       setSelectedMasterAccountId(initial ? (initial as any).master_account_id || '' : '');
+      setSellFullAccount(false);
     }
   }, [open, initial]);
 
@@ -113,6 +115,32 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Venta de cuenta completa: crear una suscripción por cada perfil disponible
+    if (accountMode === 'stock' && sellFullAccount && selectedMasterAccountId) {
+      const ma = masterAccounts.find(m => m.id === selectedMasterAccountId);
+      if (!ma) return;
+      const totalProfiles = ma.total_profiles;
+      for (let i = 0; i < totalProfiles; i++) {
+        const sub: any = {
+          ...form,
+          id: crypto.randomUUID(),
+          accountName: `${ma.platform} - ${ma.account_email.split('@')[0]} (P${i + 1})`,
+          master_account_id: selectedMasterAccountId,
+          // Distribuir el precio de venta entre los perfiles
+          salePriceOverride: form.salePriceOverride ? Math.round(Number(form.salePriceOverride) / totalProfiles) : undefined,
+          notes: form.notes || `Cuenta completa (${i + 1}/${totalProfiles})`,
+        };
+        onSave(sub);
+      }
+      setForm(empty);
+      setAccountMode('manual');
+      setSelectedMasterAccountId('');
+      setSellFullAccount(false);
+      onClose();
+      return;
+    }
+
     const sub: any = {
       ...form,
       id: initial?.id || crypto.randomUUID(),
@@ -126,6 +154,7 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
     setForm(empty);
     setAccountMode('manual');
     setSelectedMasterAccountId('');
+    setSellFullAccount(false);
     onClose();
   };
 
@@ -195,9 +224,34 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
                 </Select>
               )}
               {selectedMasterAccountId && (
-                <div className="text-[10px] text-muted-foreground space-y-0.5">
-                  <p>📧 {form.accountEmail}</p>
-                  <p>🔒 Contraseña asignada automáticamente</p>
+                <div className="space-y-2">
+                  <div className="text-[10px] text-muted-foreground space-y-0.5">
+                    <p>📧 {form.accountEmail}</p>
+                    <p>🔒 Contraseña asignada automáticamente</p>
+                  </div>
+                  {/* Toggle cuenta completa */}
+                  {!initial && (() => {
+                    const ma = masterAccounts.find(m => m.id === selectedMasterAccountId);
+                    if (!ma || ma.total_profiles <= 1) return null;
+                    const assignedCount = allSubscriptions.filter(s => (s as any).master_account_id === ma.id).length;
+                    const allAvailable = assignedCount === 0;
+                    if (!allAvailable) return null;
+                    return (
+                      <div className={`p-2.5 rounded-lg border transition-all cursor-pointer ${sellFullAccount ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-muted/50 border-muted hover:border-primary/30'}`}
+                        onClick={() => setSellFullAccount(p => !p)}>
+                        <div className="flex items-center gap-2">
+                          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${sellFullAccount ? 'bg-emerald-500 border-emerald-500' : 'border-muted-foreground/40'}`}>
+                            {sellFullAccount && <span className="text-white text-[10px] font-bold">✓</span>}
+                          </div>
+                          <Users className="h-3.5 w-3.5 text-primary" />
+                          <div>
+                            <p className="text-xs font-semibold">Vender cuenta completa ({ma.total_profiles} perfiles)</p>
+                            <p className="text-[10px] text-muted-foreground">Se crearán {ma.total_profiles} suscripciones para el mismo cliente</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>
@@ -261,14 +315,26 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
           </div>
 
           <div className="space-y-1.5 p-3 bg-primary/5 rounded-xl border border-primary/20">
-            <Label className="text-xs font-semibold text-primary">Precio de venta acordado (opcional)</Label>
+            <Label className="text-xs font-semibold text-primary">
+              {sellFullAccount ? 'Precio de venta cuenta completa (opcional)' : 'Precio de venta acordado (opcional)'}
+            </Label>
             <Input 
               type="number" 
               value={form.salePriceOverride || ''} 
               onChange={e => set('salePriceOverride', e.target.value === '' ? '' : Number(e.target.value) as any)} 
-              placeholder="Ej: Precio especial o dejalo en blanco para usar el costo base" 
+              placeholder={sellFullAccount ? 'Precio total de la cuenta completa' : 'Ej: Precio especial o dejalo en blanco para usar el costo base'} 
             />
-            <p className="text-[10px] text-muted-foreground mt-1">Si dejas esto en blanco, se usará el precio por defecto de la configuración general.</p>
+            {sellFullAccount && form.salePriceOverride ? (() => {
+              const ma = masterAccounts.find(m => m.id === selectedMasterAccountId);
+              const profiles = ma?.total_profiles || 1;
+              return (
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Se distribuirá como <span className="font-bold text-foreground">${Math.round(Number(form.salePriceOverride) / profiles).toLocaleString('es-CO')}</span> por perfil ({profiles} perfiles)
+                </p>
+              );
+            })() : (
+              <p className="text-[10px] text-muted-foreground mt-1">Si dejas esto en blanco, se usará el precio por defecto de la configuración general.</p>
+            )}
           </div>
 
           <div className="space-y-1.5">
