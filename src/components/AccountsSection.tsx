@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { MasterAccount } from '@/types/masterAccount';
 import { Subscription } from '@/types/subscription';
 import { supabase } from '@/lib/supabase';
@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { formatCOP } from '@/types/platformPricing';
-import { Package, Plus, Pencil, Trash2, Eye, EyeOff, Copy, Check, Search, Mail, Lock, Users, DollarSign, CalendarDays, Phone, MessageCircle, RefreshCw, Wrench, User } from 'lucide-react';
+import { Package, Plus, Pencil, Trash2, Eye, EyeOff, Copy, Check, Search, Mail, Lock, Users, DollarSign, CalendarDays, Phone, MessageCircle, RefreshCw, Wrench, User, AlertTriangle, Clock, ChevronDown, ChevronUp, Timer } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Props {
@@ -29,8 +29,10 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [filterPlatform, setFilterPlatform] = useState('all');
+  const [filterExpiry, setFilterExpiry] = useState<'all' | 'expiring' | 'expired'>('all');
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [showExpiryPanel, setShowExpiryPanel] = useState(false);
 
   // Form state
   const emptyForm = { platform: dynamicPlatforms[0] || 'Netflix', account_email: '', account_password: '', total_profiles: 4, purchase_price: 0, notes: '', purchase_date: new Date().toISOString().split('T')[0], supplier_phone: '', supplier_name: '' };
@@ -40,17 +42,55 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
     return subscriptions.filter(s => (s as any).master_account_id === accountId).length;
   };
 
-  const enrichedAccounts = accounts.map(a => ({
-    ...a,
-    assigned_profiles: getAssignedCount(a.id),
-    available_profiles: a.total_profiles - getAssignedCount(a.id),
-  }));
+  // Helper: calcular días para vencimiento (purchase_date + 30)
+  const getDaysToExpiry = (purchaseDate?: string): number => {
+    if (!purchaseDate) return 999;
+    const d = new Date(purchaseDate + 'T12:00:00');
+    const expiry = new Date(d);
+    expiry.setDate(expiry.getDate() + 30);
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    expiry.setHours(0, 0, 0, 0);
+    return Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  const getExpiryDate = (purchaseDate?: string): string => {
+    if (!purchaseDate) return 'N/A';
+    const d = new Date(purchaseDate + 'T12:00:00');
+    d.setDate(d.getDate() + 30);
+    return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+  };
+
+  const getExpiryStatus = (days: number) => {
+    if (days <= 0) return { label: 'Vencida', color: 'text-red-500 bg-red-500/10 border-red-500/30', border: 'border-red-500/50', icon: 'expired' };
+    if (days <= 3) return { label: `${days}d`, color: 'text-red-400 bg-red-400/10 border-red-400/30', border: 'border-red-400/40', icon: 'danger' };
+    if (days <= 7) return { label: `${days}d`, color: 'text-amber-500 bg-amber-500/10 border-amber-500/30', border: 'border-amber-500/40', icon: 'warning' };
+    return { label: `${days}d`, color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/30', border: '', icon: 'ok' };
+  };
+
+  const enrichedAccounts = accounts.map(a => {
+    const daysLeft = getDaysToExpiry(a.purchase_date);
+    return {
+      ...a,
+      assigned_profiles: getAssignedCount(a.id),
+      available_profiles: a.total_profiles - getAssignedCount(a.id),
+      daysToExpiry: daysLeft,
+      expiryDate: getExpiryDate(a.purchase_date),
+    };
+  });
 
   const filtered = enrichedAccounts.filter(a => {
     if (search && !a.account_email.toLowerCase().includes(search.toLowerCase()) && !a.platform.toLowerCase().includes(search.toLowerCase())) return false;
     if (filterPlatform !== 'all' && a.platform !== filterPlatform) return false;
+    if (filterExpiry === 'expiring' && a.daysToExpiry > 7) return false;
+    if (filterExpiry === 'expired' && a.daysToExpiry > 0) return false;
     return true;
   });
+
+  // Expiry stats
+  const expiringAccounts = useMemo(() => enrichedAccounts.filter(a => a.daysToExpiry <= 7 && a.daysToExpiry > 0).sort((a, b) => a.daysToExpiry - b.daysToExpiry), [enrichedAccounts]);
+  const expiredAccounts = useMemo(() => enrichedAccounts.filter(a => a.daysToExpiry <= 0).sort((a, b) => a.daysToExpiry - b.daysToExpiry), [enrichedAccounts]);
+  const totalUrgent = expiringAccounts.length + expiredAccounts.length;
 
   const handleOpenForm = (account?: MasterAccount) => {
     if (account) {
@@ -162,7 +202,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
   return (
     <div className="space-y-5 animate-fade-in">
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div className="bg-card border rounded-xl p-3 sm:p-4">
           <p className="text-[10px] sm:text-xs text-muted-foreground">Cuentas en Stock</p>
           <p className="text-xl sm:text-2xl font-bold">{totalAccounts}</p>
@@ -175,11 +215,90 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
           <p className="text-[10px] sm:text-xs text-emerald-500">Disponibles</p>
           <p className="text-xl sm:text-2xl font-bold text-emerald-500">{totalAvailable}</p>
         </div>
+        <div className="bg-card border rounded-xl p-3 sm:p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => { setFilterExpiry(f => f === 'expiring' ? 'all' : 'expiring'); setShowExpiryPanel(p => !p); }}>
+          <p className="text-[10px] sm:text-xs text-amber-500 flex items-center gap-1"><Timer className="h-3 w-3" /> Por vencer</p>
+          <p className={`text-xl sm:text-2xl font-bold ${totalUrgent > 0 ? 'text-amber-500' : 'text-muted-foreground'}`}>{totalUrgent}</p>
+        </div>
         <div className="bg-card border rounded-xl p-3 sm:p-4">
           <p className="text-[10px] sm:text-xs text-muted-foreground">Inversión Total</p>
           <p className="text-lg sm:text-xl font-bold">{formatCOP(totalInvested)}</p>
         </div>
       </div>
+
+      {/* Expiry Alert Banner */}
+      {totalUrgent > 0 && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 overflow-hidden">
+          <button
+            onClick={() => setShowExpiryPanel(p => !p)}
+            className="w-full flex items-center justify-between p-3 hover:bg-amber-500/10 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+              <span className="text-sm font-semibold text-amber-500">
+                {expiredAccounts.length > 0 && `${expiredAccounts.length} vencida${expiredAccounts.length > 1 ? 's' : ''}`}
+                {expiredAccounts.length > 0 && expiringAccounts.length > 0 && ' · '}
+                {expiringAccounts.length > 0 && `${expiringAccounts.length} por vencer`}
+              </span>
+            </div>
+            {showExpiryPanel ? <ChevronUp className="h-4 w-4 text-amber-500" /> : <ChevronDown className="h-4 w-4 text-amber-500" />}
+          </button>
+
+          {showExpiryPanel && (
+            <div className="px-3 pb-3 space-y-2">
+              {expiredAccounts.map(a => (
+                <div key={a.id} className="flex items-center justify-between bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-red-500 text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-500/20 shrink-0">VENCIDA</span>
+                    <span className="text-xs font-semibold truncate">{a.platform}</span>
+                    <span className="text-[10px] text-muted-foreground truncate hidden sm:inline">{a.account_email}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[10px] text-red-400">Venció {getExpiryDate(a.purchase_date)}</span>
+                    {a.supplier_phone && (
+                      <Button size="sm" variant="outline" className="h-6 text-[9px] text-green-600 border-green-600/30" onClick={() => {
+                        const phone = a.supplier_phone!.replace(/\D/g, '');
+                        const provName = a.supplier_name || 'Proveedor';
+                        const purchaseD = new Date((a.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
+                        const cutoff = new Date(purchaseD); cutoff.setDate(cutoff.getDate() + 30);
+                        const fmtDate = (d: Date) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
+                        const msg = `Hola\u00A1 ${provName} le escribo por el siguiente servicio de ${a.platform}\n\n\uD83D\uDCE7 Correo: ${a.account_email}\n\uD83D\uDD11 Contrase\u00F1a: ${a.account_password}\n\uD83D\uDDD3\uFE0F Fecha de inicio: ${fmtDate(purchaseD)}\n\u2622\uFE0F Fecha de fin: ${fmtDate(cutoff)}\n\nSolicito renovacion del servicio.`;
+                        window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`, '_blank');
+                      }}>
+                        <RefreshCw className="h-3 w-3 mr-1" /> Renovar
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {expiringAccounts.map(a => (
+                <div key={a.id} className="flex items-center justify-between bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${a.daysToExpiry <= 3 ? 'text-red-400 bg-red-400/20' : 'text-amber-500 bg-amber-500/20'}`}>{a.daysToExpiry}d</span>
+                    <span className="text-xs font-semibold truncate">{a.platform}</span>
+                    <span className="text-[10px] text-muted-foreground truncate hidden sm:inline">{a.account_email}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[10px] text-amber-400">Vence {a.expiryDate}</span>
+                    {a.supplier_phone && (
+                      <Button size="sm" variant="outline" className="h-6 text-[9px] text-green-600 border-green-600/30" onClick={() => {
+                        const phone = a.supplier_phone!.replace(/\D/g, '');
+                        const provName = a.supplier_name || 'Proveedor';
+                        const purchaseD = new Date((a.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
+                        const cutoff = new Date(purchaseD); cutoff.setDate(cutoff.getDate() + 30);
+                        const fmtDate = (d: Date) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
+                        const msg = `Hola\u00A1 ${provName} le escribo por el siguiente servicio de ${a.platform}\n\n\uD83D\uDCE7 Correo: ${a.account_email}\n\uD83D\uDD11 Contrase\u00F1a: ${a.account_password}\n\uD83D\uDDD3\uFE0F Fecha de inicio: ${fmtDate(purchaseD)}\n\u2622\uFE0F Fecha de fin: ${fmtDate(cutoff)}\n\nSolicito renovacion del servicio.`;
+                        window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`, '_blank');
+                      }}>
+                        <RefreshCw className="h-3 w-3 mr-1" /> Renovar
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Search + Filters + Add Button */}
       <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
@@ -215,10 +334,18 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
             const costPerProfile = account.total_profiles > 0 ? Math.round(account.purchase_price / account.total_profiles) : 0;
 
             return (
-              <div key={account.id} className="bg-card border rounded-xl p-4 space-y-3 hover:shadow-md transition-shadow">
+              <div key={account.id} className={`bg-card border rounded-xl p-4 space-y-3 hover:shadow-md transition-shadow ${getExpiryStatus(account.daysToExpiry).border}`}>
                 {/* Header */}
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold">{account.platform}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold">{account.platform}</span>
+                    {account.daysToExpiry <= 7 && (
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border flex items-center gap-0.5 ${getExpiryStatus(account.daysToExpiry).color}`}>
+                        <Clock className="h-2.5 w-2.5" />
+                        {account.daysToExpiry <= 0 ? 'Vencida' : `${account.daysToExpiry}d`}
+                      </span>
+                    )}
+                  </div>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusClass}`}>
                     {available > 0 ? `${available} disponible${available > 1 ? 's' : ''}` : 'Completa'}
                   </span>
@@ -262,10 +389,13 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
                 {/* Financial info */}
                 <div className="flex justify-between items-center text-[10px] border-t pt-2 pb-1">
                   <span className="text-muted-foreground flex items-center gap-1"><DollarSign className="h-3 w-3" /> Costo: <span className="text-foreground font-semibold">{formatCOP(account.purchase_price)}</span></span>
-                  <span className="text-muted-foreground flex items-center gap-1"><CalendarDays className="h-3 w-3" /> Adquisición: <span className="text-foreground font-semibold">{account.purchase_date || 'N/A'}</span></span>
+                  <span className="text-muted-foreground">P/perfil: <span className="text-foreground font-semibold">{formatCOP(costPerProfile)}</span></span>
                 </div>
-                <div className="text-[10px] text-right text-muted-foreground pb-2">
-                  P/perfil: <span className="text-foreground font-semibold">{formatCOP(costPerProfile)}</span>
+                <div className="flex justify-between items-center text-[10px] pb-1">
+                  <span className="text-muted-foreground flex items-center gap-1"><CalendarDays className="h-3 w-3" /> Compra: <span className="text-foreground font-semibold">{account.purchase_date || 'N/A'}</span></span>
+                  <span className={`flex items-center gap-1 ${account.daysToExpiry <= 3 ? 'text-red-400' : account.daysToExpiry <= 7 ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                    <Timer className="h-3 w-3" /> Vence: <span className="font-semibold">{account.expiryDate}</span>
+                  </span>
                 </div>
 
                 {/* Supplier info */}
