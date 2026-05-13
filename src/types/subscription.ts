@@ -16,6 +16,7 @@ export interface Subscription {
   accountName?: string; // optional grouping label
   salePriceOverride?: number; // Precio de cobro específico acordado (IPTV combos)
   master_account_id?: string; // Enlace a cuenta maestra de stock
+  profiles_sold?: number; // Cantidad de perfiles vendidos (cuenta completa = total_profiles)
 }
 
 // Array removido ya que ahora se obtiene dinámicamente de Pricing.

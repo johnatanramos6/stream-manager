@@ -67,10 +67,12 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
   const availableMasterAccounts = useMemo(() => {
     return masterAccounts.filter(ma => {
       if (ma.platform !== form.platform) return false;
-      const assignedCount = allSubscriptions.filter(s => (s as any).master_account_id === ma.id).length;
+      const assignedCount = allSubscriptions.filter(s => (s as any).master_account_id === ma.id)
+        .reduce((sum, s) => sum + ((s as any).profiles_sold || 1), 0);
       return assignedCount < ma.total_profiles;
     }).map(ma => {
-      const assignedCount = allSubscriptions.filter(s => (s as any).master_account_id === ma.id).length;
+      const assignedCount = allSubscriptions.filter(s => (s as any).master_account_id === ma.id)
+        .reduce((sum, s) => sum + ((s as any).profiles_sold || 1), 0);
       return { ...ma, assigned: assignedCount, available: ma.total_profiles - assignedCount };
     });
   }, [masterAccounts, form.platform, allSubscriptions, open]);
@@ -116,23 +118,19 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Venta de cuenta completa: crear una suscripción por cada perfil disponible
+    // Venta de cuenta completa: UNA sola suscripci\u00f3n que ocupa todos los perfiles
     if (accountMode === 'stock' && sellFullAccount && selectedMasterAccountId) {
       const ma = masterAccounts.find(m => m.id === selectedMasterAccountId);
       if (!ma) return;
-      const totalProfiles = ma.total_profiles;
-      for (let i = 0; i < totalProfiles; i++) {
-        const sub: any = {
-          ...form,
-          id: crypto.randomUUID(),
-          accountName: `${ma.platform} - ${ma.account_email.split('@')[0]} (P${i + 1})`,
-          master_account_id: selectedMasterAccountId,
-          // Distribuir el precio de venta entre los perfiles
-          salePriceOverride: form.salePriceOverride ? Math.round(Number(form.salePriceOverride) / totalProfiles) : undefined,
-          notes: form.notes || `Cuenta completa (${i + 1}/${totalProfiles})`,
-        };
-        onSave(sub);
-      }
+      const sub: any = {
+        ...form,
+        id: crypto.randomUUID(),
+        accountName: `${ma.platform} - ${ma.account_email.split('@')[0]} (Completa)`,
+        master_account_id: selectedMasterAccountId,
+        profiles_sold: ma.total_profiles,
+        notes: form.notes || `Cuenta completa (${ma.total_profiles} perfiles)`,
+      };
+      onSave(sub);
       setForm(empty);
       setAccountMode('manual');
       setSelectedMasterAccountId('');
@@ -324,16 +322,15 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
               onChange={e => set('salePriceOverride', e.target.value === '' ? '' : Number(e.target.value) as any)} 
               placeholder={sellFullAccount ? 'Precio total de la cuenta completa' : 'Ej: Precio especial o dejalo en blanco para usar el costo base'} 
             />
-            {sellFullAccount && form.salePriceOverride ? (() => {
-              const ma = masterAccounts.find(m => m.id === selectedMasterAccountId);
-              const profiles = ma?.total_profiles || 1;
-              return (
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  Se distribuirá como <span className="font-bold text-foreground">${Math.round(Number(form.salePriceOverride) / profiles).toLocaleString('es-CO')}</span> por perfil ({profiles} perfiles)
-                </p>
-              );
-            })() : (
-              <p className="text-[10px] text-muted-foreground mt-1">Si dejas esto en blanco, se usará el precio por defecto de la configuración general.</p>
+            {sellFullAccount ? (
+              <p className="text-[10px] text-muted-foreground mt-1">
+                {form.salePriceOverride 
+                  ? <>Este ser&aacute; el precio total de venta por la cuenta completa con todos los perfiles.</>
+                  : <>Si dejas esto en blanco, se usar&aacute; el precio por defecto de la configuraci&oacute;n general.</>
+                }
+              </p>
+            ) : (
+              <p className="text-[10px] text-muted-foreground mt-1">Si dejas esto en blanco, se usar&aacute; el precio por defecto de la configuraci&oacute;n general.</p>
             )}
           </div>
 

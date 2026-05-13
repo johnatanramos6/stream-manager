@@ -39,7 +39,8 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
   const [form, setForm] = useState(emptyForm);
 
   const getAssignedCount = (accountId: string) => {
-    return subscriptions.filter(s => (s as any).master_account_id === accountId).length;
+    return subscriptions.filter(s => (s as any).master_account_id === accountId)
+      .reduce((sum, s) => sum + ((s as any).profiles_sold || 1), 0);
   };
 
   // Helper: calcular días para vencimiento (purchase_date + 30)

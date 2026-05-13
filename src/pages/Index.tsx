@@ -216,7 +216,8 @@ function IndexContent() {
           notes: d.notes,
           accountName: d.account_name,
           salePriceOverride: d.sale_price_override,
-          master_account_id: d.master_account_id
+          master_account_id: d.master_account_id,
+          profiles_sold: d.profiles_sold || 1
         })));
       }
       if (error) toast.error("Error al cargar las suscripciones.");
@@ -536,7 +537,8 @@ function IndexContent() {
       notes: sub.notes,
       account_name: sub.accountName,
       sale_price_override: sub.salePriceOverride,
-      master_account_id: sub.master_account_id || null
+      master_account_id: sub.master_account_id || null,
+      profiles_sold: sub.profiles_sold || 1
     };
 
     const { error } = await supabase.from('subscriptions').upsert(payload);
