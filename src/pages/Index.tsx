@@ -802,6 +802,7 @@ function IndexContent() {
               onEdit={handleEdit}
               onDelete={handleDeleteRequest}
               onTogglePayment={handleTogglePayment}
+              onSendWelcome={setWelcomeSub}
             />
           </>
         ) : activeTab === 'accounts' ? (

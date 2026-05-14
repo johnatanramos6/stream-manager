@@ -1,7 +1,8 @@
 import { Subscription, getPlatformClass, getRowStatus, getDaysUntilPayment, getNextPaymentDate } from '@/types/subscription';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Pencil, Trash2, Eye, EyeOff, Copy, Check, ArrowUpDown, MessageCircle } from 'lucide-react';
+import { Pencil, Trash2, Eye, EyeOff, Copy, Check, ArrowUpDown, MessageCircle, MoreVertical, KeyRound, Share, CalendarClock } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -9,13 +10,15 @@ interface Props {
   subscriptions: Subscription[];
   onEdit: (sub: Subscription) => void;
   onDelete: (id: string) => void;
+  onDelete: (id: string) => void;
   onTogglePayment: (id: string) => void;
+  onSendWelcome: (sub: Subscription) => void;
 }
 
 type SortKey = 'clientName' | 'platform' | 'purchaseDate' | 'paymentStatus' | null;
 type SortDir = 'asc' | 'desc';
 
-export default function SubscriptionTable({ subscriptions, onEdit, onDelete, onTogglePayment }: Props) {
+export default function SubscriptionTable({ subscriptions, onEdit, onDelete, onTogglePayment, onSendWelcome }: Props) {
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>(null);
@@ -56,6 +59,16 @@ Para que no pierdas el acceso al contenido, puedes renovarla desde hoy mismo, co
 Quedo pendiente 👍`;
 
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
+
+  const sendPasswordUpdate = (sub: Subscription) => {
+    if (!sub.clientPhone) return toast.error("Este cliente no tiene un teléfono registrado.");
+    const phone = sub.clientPhone.replace(/\D/g, '');
+    if (!phone) return toast.error("El número de teléfono no es válido.");
+    
+    const message = `Hola ${sub.clientName}, tu contraseña de *${sub.platform}* ha sido actualizada por motivos de seguridad o mantenimiento.\n\n🔐 *Nueva contraseña:* ${sub.accountPassword}\n\n¡Que disfrutes tu servicio!`;
+    const url = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
 
@@ -178,16 +191,33 @@ Quedo pendiente 👍`;
                   <td className="p-3 text-xs text-muted-foreground max-w-[120px] truncate">{sub.notes || '—'}</td>
                   <td className="p-3 text-right">
                     <div className="flex gap-1 justify-end">
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
-                        className={`h-7 w-7 ${sub.clientPhone ? 'text-green-600 hover:bg-green-600/10 hover:text-green-700' : 'text-muted-foreground/30'}`}
-                        onClick={() => sub.clientPhone && sendWhatsAppReminder(sub)}
-                        disabled={!sub.clientPhone}
-                        title="Enviar recordatorio por WhatsApp"
-                      >
-                        <MessageCircle className="h-3.5 w-3.5" />
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            className={`h-7 w-7 ${sub.clientPhone ? 'text-green-600 hover:bg-green-600/10 hover:text-green-700' : 'text-muted-foreground/30'}`}
+                            disabled={!sub.clientPhone}
+                            title="Opciones de mensajes"
+                          >
+                            <MessageCircle className="h-3.5 w-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuItem onClick={() => sendWhatsAppReminder(sub)}>
+                            <CalendarClock className="mr-2 h-4 w-4" />
+                            <span>Aviso de renovación</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => onSendWelcome(sub)}>
+                            <Share className="mr-2 h-4 w-4" />
+                            <span>Enviar datos de cuenta</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => sendPasswordUpdate(sub)}>
+                            <KeyRound className="mr-2 h-4 w-4" />
+                            <span>Cambio de contraseña</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <Button size="icon" variant="ghost" className="h-7 w-7 hover:bg-primary/10 hover:text-primary" onClick={() => onEdit(sub)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
@@ -233,15 +263,32 @@ Quedo pendiente 👍`;
                   </button>
                 </div>
                 <div className="flex gap-1">
-                  <Button 
-                    size="icon" 
-                    variant="ghost" 
-                    className={`h-8 w-8 ${sub.clientPhone ? 'text-green-600 hover:bg-green-600/10 hover:text-green-700' : 'text-muted-foreground/30'}`} 
-                    onClick={() => sub.clientPhone && sendWhatsAppReminder(sub)}
-                    disabled={!sub.clientPhone}
-                  >
-                    <MessageCircle className="h-3.5 w-3.5" />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className={`h-8 w-8 ${sub.clientPhone ? 'text-green-600 hover:bg-green-600/10 hover:text-green-700' : 'text-muted-foreground/30'}`} 
+                        disabled={!sub.clientPhone}
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem onClick={() => sendWhatsAppReminder(sub)}>
+                        <CalendarClock className="mr-2 h-4 w-4" />
+                        <span>Aviso de renovación</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onSendWelcome(sub)}>
+                        <Share className="mr-2 h-4 w-4" />
+                        <span>Enviar datos de cuenta</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => sendPasswordUpdate(sub)}>
+                        <KeyRound className="mr-2 h-4 w-4" />
+                        <span>Cambio de contraseña</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-primary/10 hover:text-primary" onClick={() => onEdit(sub)}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
