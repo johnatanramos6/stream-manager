@@ -56,24 +56,24 @@ export default function WelcomeWhatsAppDialog({ open, onClose, subscription }: P
     // Plantilla para perfil individual
     const lines = [
       '\uD83C\uDFAC SERVICIO DE STREAMING ACTIVADO \u2705',
-      `Hola, ${subscription.clientName}. A continuaci\u00F3n encontrar\u00E1s tus datos de acceso:`,
+      `Hola, ${subscription.clientName} a continuaci\u00F3n encontrar\u00E1s tus datos de acceso:`,
       '',
       `\uD83D\uDCCC Plataforma: ${subscription.platform}`,
       `\uD83D\uDCE7 Correo: ${subscription.accountEmail}`,
       `\uD83D\uDD10 Contrase\u00F1a: ${subscription.accountPassword}`,
-      `\uD83D\uDC64 Perfil asignado: ${subscription.accountName || 'N/A'}`,
-      `\uD83D\uDD22 PIN del perfil: ${subscription.profilePin || 'N/A'}`,
+      `\uD83D\uDC64 Perfil: ${subscription.accountName || 'N/A'}`,
+      `\uD83D\uDD22 PIN: ${subscription.profilePin || 'N/A'}`,
       '',
       `\uD83D\uDCC5 Fecha de inicio: ${formatDateES(subscription.purchaseDate)}`,
       `\u23F3 Fecha de corte: ${cutoffStr}`,
       '',
       '\u26A0\uFE0F Recomendaciones importantes:',
-      '\u2022 Ingresa \u00FAnicamente al perfil asignado.',
-      '\u2022 No cambies el correo, contrase\u00F1a, perfil ni PIN.',
-      '\u2022 No compartas los datos de acceso con terceros.',
-      '\u2022 Si tienes alg\u00FAn inconveniente, escr\u00EDbenos para ayudarte.',
+      '* Ingresa \u00FAnicamente al perfil asignado.',
+      '* No cambies el correo, contrase\u00F1a, perfil ni PIN.',
+      '* No compartas los datos de acceso con terceros.',
+      '* Si tienes alg\u00FAn inconveniente, escr\u00EDbeme para ayudarte.',
       '',
-      '\u2705 Gracias por confiar en nosotros.',
+      '\u2705 Gracias por confiar en mis servicios.',
       '\uD83C\uDF7F \u00A1Disfruta tu contenido!'
     ];
 
