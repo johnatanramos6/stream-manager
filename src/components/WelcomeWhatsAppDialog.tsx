@@ -31,6 +31,29 @@ export default function WelcomeWhatsAppDialog({ open, onClose, subscription }: P
     cutoffDate.setDate(cutoffDate.getDate() + 30);
     const cutoffStr = `${cutoffDate.getDate().toString().padStart(2, '0')}/${(cutoffDate.getMonth() + 1).toString().padStart(2, '0')}/${cutoffDate.getFullYear()}`;
 
+    const isFullAccount = (subscription.profiles_sold || 1) > 1;
+
+    if (isFullAccount) {
+      // Plantilla para cuenta completa
+      const lines = [
+        '\uD83C\uDFAC SERVICIO DE STREAMING ACTIVADO \u2705',
+        `Hola, ${subscription.clientName}. A continuaci\u00F3n encontrar\u00E1s tus datos de acceso:`,
+        '',
+        `\uD83D\uDCCC Plataforma: ${subscription.platform}`,
+        `\uD83D\uDCE7 Correo: ${subscription.accountEmail}`,
+        `\uD83D\uDD10 Contrase\u00F1a: ${subscription.accountPassword}`,
+        `\uD83D\uDC64 Perfil: ${subscription.accountName || 'N/A'}`,
+        '',
+        `\uD83D\uDCC5 Fecha de inicio: ${formatDateES(subscription.purchaseDate)}`,
+        `\u23F3 Fecha de corte: ${cutoffStr}`,
+        '',
+        '\u2705 Si tienes alg\u00FAn inconveniente, escr\u00EDbeme para ayudarte.',
+        '\u2705 Gracias por confiar en nuestros servicios.'
+      ];
+      return lines.join('\n');
+    }
+
+    // Plantilla para perfil individual
     const lines = [
       '\uD83C\uDFAC SERVICIO DE STREAMING ACTIVADO \u2705',
       `Hola, ${subscription.clientName}. A continuaci\u00F3n encontrar\u00E1s tus datos de acceso:`,
