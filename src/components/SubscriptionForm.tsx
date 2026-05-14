@@ -110,7 +110,6 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
         ...prev,
         accountEmail: ma.account_email,
         accountPassword: ma.account_password,
-        accountName: `${ma.platform} - ${ma.account_email.split('@')[0]}`,
       }));
     }
   };
@@ -125,7 +124,6 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
       const sub: any = {
         ...form,
         id: crypto.randomUUID(),
-        accountName: `${ma.platform} - ${ma.account_email.split('@')[0]} (Completa)`,
         master_account_id: selectedMasterAccountId,
         profiles_sold: ma.total_profiles,
         notes: form.notes || `Cuenta completa (${ma.total_profiles} perfiles)`,
