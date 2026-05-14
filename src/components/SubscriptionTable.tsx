@@ -67,7 +67,24 @@ Quedo pendiente 👍`;
     const phone = sub.clientPhone.replace(/\D/g, '');
     if (!phone) return toast.error("El número de teléfono no es válido.");
     
-    const message = `Hola ${sub.clientName}, tu contraseña de *${sub.platform}* ha sido actualizada por motivos de seguridad o mantenimiento.\n\n🔐 *Nueva contraseña:* ${sub.accountPassword}\n\n¡Que disfrutes tu servicio!`;
+    const purchaseD = new Date(sub.purchaseDate + 'T12:00:00');
+    const cutoffDate = new Date(purchaseD);
+    cutoffDate.setDate(cutoffDate.getDate() + 30);
+    const formatES = (d: Date) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+
+    const lines = [
+      `Hola, ${sub.clientName} tu contraseña de *${sub.platform}* ha sido actualizada por motivos de seguridad o mantenimiento.`,
+      '',
+      `\uD83D\uDCE7 Correo: ${sub.accountEmail}`,
+      `\uD83D\uDD10 *Nueva contraseña:*: ${sub.accountPassword}`,
+      `\uD83D\uDC64 Perfil: ${sub.accountName || 'N/A'}`,
+      `\uD83D\uDD22 PIN: ${sub.profilePin || 'N/A'}`,
+      '',
+      `\uD83D\uDCC5 Fecha de inicio: ${formatES(purchaseD)}`,
+      `\u23F3 Fecha de corte: ${formatES(cutoffDate)}`
+    ];
+
+    const message = lines.join('\n');
     const url = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };

@@ -22,9 +22,26 @@ export default function PasswordNotifierDialog({ open, onClose, clients, newPass
     const phone = client.clientPhone.replace(/\D/g, '');
     
     // Mensaje predeterminado personalizado
-    const message = `Hola ${client.clientName}, tu contraseña de *${platform}* ha sido actualizada por motivos de seguridad o mantenimiento.\n\n🔐 *Nueva contraseña:* ${newPassword}\n\n¡Que disfrutes tu servicio!`;
+    const purchaseD = new Date(client.purchaseDate + 'T12:00:00');
+    const cutoffDate = new Date(purchaseD);
+    cutoffDate.setDate(cutoffDate.getDate() + 30);
+    const formatES = (d: Date) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+
+    const lines = [
+      `Hola, ${client.clientName} tu contraseña de *${platform}* ha sido actualizada por motivos de seguridad o mantenimiento.`,
+      '',
+      `\uD83D\uDCE7 Correo: ${client.accountEmail}`,
+      `\uD83D\uDD10 *Nueva contraseña:*: ${newPassword}`,
+      `\uD83D\uDC64 Perfil: ${client.accountName || 'N/A'}`,
+      `\uD83D\uDD22 PIN: ${client.profilePin || 'N/A'}`,
+      '',
+      `\uD83D\uDCC5 Fecha de inicio: ${formatES(purchaseD)}`,
+      `\u23F3 Fecha de corte: ${formatES(cutoffDate)}`
+    ];
+
+    const message = lines.join('\n');
     
-    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    const url = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
     
     setNotified(prev => new Set([...prev, client.id]));
