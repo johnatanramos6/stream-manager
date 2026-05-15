@@ -12,6 +12,7 @@ import InstallPWA from '@/components/InstallPWA';
 import ChangePassword from '@/components/ChangePassword';
 import PasswordNotifierDialog from '@/components/PasswordNotifierDialog';
 import WelcomeWhatsAppDialog from '@/components/WelcomeWhatsAppDialog';
+import ReplacementWhatsAppDialog from '@/components/ReplacementWhatsAppDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -189,8 +190,9 @@ function IndexContent() {
   const [showAdmin, setShowAdmin] = useState(false);
   const [pricingConfig, setPricingConfig] = useState(DEFAULT_PRICING);
   const [masterAccounts, setMasterAccounts] = useState<MasterAccount[]>([]);
-  const [notifyState, setNotifyState] = useState<{ open: boolean; clients: Subscription[]; newPassword: string; platform: string }>({ open: false, clients: [], newPassword: '', platform: '' });
+  const [notifyState, setNotifyState] = useState<{ open: boolean, clients: Subscription[], newPassword: string, platform: string }>({ open: false, clients: [], newPassword: '', platform: '' });
   const [welcomeSub, setWelcomeSub] = useState<Subscription | null>(null);
+  const [replacementSub, setReplacementSub] = useState<Subscription | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const dynamicPlatforms = Array.isArray(pricingConfig) 
@@ -603,6 +605,18 @@ function IndexContent() {
     // Mostrar opción de enviar datos por WhatsApp al crear una nueva suscripción
     if (isNew) {
       setWelcomeSub(sub);
+    } else if (editing) {
+      // Detección de cuenta de reemplazo: Si cambió correo, pin o nombre de cuenta
+      const isReplacement = 
+        editing.accountEmail !== sub.accountEmail ||
+        editing.profilePin !== sub.profilePin ||
+        editing.accountName !== sub.accountName;
+
+      // Nota: el cambio de contraseña ya lo maneja notifyState si afecta a otros, 
+      // pero si es un reemplazo completo de la cuenta/perfil individual, mostramos este diálogo.
+      if (isReplacement) {
+        setReplacementSub(sub);
+      }
     }
   };
 
@@ -902,6 +916,12 @@ function IndexContent() {
         open={!!welcomeSub}
         onClose={() => setWelcomeSub(null)}
         subscription={welcomeSub}
+      />
+
+      <ReplacementWhatsAppDialog
+        open={!!replacementSub}
+        onClose={() => setReplacementSub(null)}
+        subscription={replacementSub}
       />
 
       <InstallPWA />

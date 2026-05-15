@@ -1,8 +1,8 @@
 import { Subscription, getPlatformClass, getRowStatus, getDaysUntilPayment, getNextPaymentDate } from '@/types/subscription';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Pencil, Trash2, Eye, EyeOff, Copy, Check, ArrowUpDown, MessageCircle, MoreVertical, KeyRound, Share, CalendarClock } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Pencil, Trash2, Eye, EyeOff, Copy, Check, ArrowUpDown, MessageCircle, MoreVertical, KeyRound, Share, CalendarClock, RefreshCw } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -82,6 +82,35 @@ Quedo pendiente 👍`;
       '',
       `\uD83D\uDCC5 Fecha de inicio: ${formatES(purchaseD)}`,
       `\u23F3 Fecha de corte: ${formatES(cutoffDate)}`
+    ];
+
+    const message = lines.join('\n');
+    const url = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
+
+  const sendReplacement = (sub: Subscription) => {
+    if (!sub.clientPhone) return toast.error("Este cliente no tiene un teléfono registrado.");
+    const phone = sub.clientPhone.replace(/\D/g, '');
+    if (!phone) return toast.error("El número de teléfono no es válido.");
+    
+    const purchaseD = new Date(sub.purchaseDate + 'T12:00:00');
+    const cutoffDate = new Date(purchaseD);
+    cutoffDate.setDate(cutoffDate.getDate() + 30);
+    const formatES = (d: Date) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+
+    const lines = [
+      `\uD83D\uDD02 *CUENTA DE REEMPLAZO DE ${sub.platform.toUpperCase()}*`,
+      '',
+      `Hola, ${sub.clientName} En garantia de su servicio y por dificultades tecnicas, le entregamos nuevos datos de acceso`,
+      '',
+      `\uD83D\uDCE7 *Correo:* ${sub.accountEmail}`,
+      `\uD83D\uDD10 *Contrase\u00F1a:* ${sub.accountPassword}`,
+      `\uD83D\uDC64 *Perfil:* ${sub.accountName || 'N/A'}`,
+      `\uD83D\uDD22 *Pin:* ${sub.profilePin || 'N/A'}`,
+      '',
+      `\uD83D\uDCC6 *Fecha de inicio:* ${formatES(purchaseD)}`,
+      `\u23F3 *Fecha de corte:* ${formatES(cutoffDate)}`
     ];
 
     const message = lines.join('\n');
@@ -233,6 +262,11 @@ Quedo pendiente 👍`;
                             <KeyRound className="mr-2 h-4 w-4" />
                             <span>Cambio de contraseña</span>
                           </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => sendReplacement(sub)}>
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                            <span>Cuenta de reemplazo</span>
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                       <Button size="icon" variant="ghost" className="h-7 w-7 hover:bg-primary/10 hover:text-primary" onClick={() => onEdit(sub)}>
@@ -303,6 +337,11 @@ Quedo pendiente 👍`;
                       <DropdownMenuItem onClick={() => sendPasswordUpdate(sub)}>
                         <KeyRound className="mr-2 h-4 w-4" />
                         <span>Cambio de contraseña</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => sendReplacement(sub)}>
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        <span>Cuenta de reemplazo</span>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
