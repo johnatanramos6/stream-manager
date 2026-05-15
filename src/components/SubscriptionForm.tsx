@@ -295,17 +295,17 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
                 <Input 
                   type="number" 
                   min="1" 
-                  value={form.duration_days === undefined ? '' : form.duration_days} 
+                  value={form.duration_days === '' ? '' : (form.duration_days || '')} 
                   onChange={e => {
                     const val = e.target.value;
-                    set('duration_days', val === '' ? ('' as any) : parseInt(val));
+                    set('duration_days', val === '' ? ('' as any) : Number(val));
                   }} 
                   required 
                   className="w-16 text-center px-1" 
                 />
                 <Select 
-                  value={String(form.duration_days || '')} 
-                  onValueChange={v => set('duration_days', parseInt(v))}
+                  value={form.duration_days ? String(form.duration_days) : ''} 
+                  onValueChange={v => set('duration_days', Number(v))}
                 >
                   <SelectTrigger className="flex-1">
                     <SelectValue placeholder="Personalizado" />
@@ -316,7 +316,7 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
                     <SelectItem value="30">1 Mes (30d)</SelectItem>
                     <SelectItem value="60">2 Meses (60d)</SelectItem>
                     <SelectItem value="90">3 Meses (90d)</SelectItem>
-                    {form.duration_days && ![25, 28, 30, 60, 90].includes(form.duration_days) && (
+                    {form.duration_days && ![25, 28, 30, 60, 90].includes(Number(form.duration_days)) && (
                       <SelectItem value={String(form.duration_days)}>{form.duration_days} días</SelectItem>
                     )}
                   </SelectContent>
