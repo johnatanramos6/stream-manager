@@ -307,7 +307,7 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
                   className="w-16 text-center px-1" 
                 />
                 <Select 
-                  value={form.duration_days ? String(form.duration_days) : "custom"} 
+                  value={[25, 28, 30, 60, 90].includes(Number(form.duration_days)) ? String(form.duration_days) : "custom"} 
                   onValueChange={v => {
                     if (v !== "custom") {
                       set('duration_days', Number(v) as any);
@@ -324,12 +324,7 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
                     <SelectItem value="30">1 Mes (30d)</SelectItem>
                     <SelectItem value="60">2 Meses (60d)</SelectItem>
                     <SelectItem value="90">3 Meses (90d)</SelectItem>
-                    {form.duration_days && ![25, 28, 30, 60, 90].includes(Number(form.duration_days)) && (
-                      <SelectItem value={String(form.duration_days)}>{form.duration_days} días</SelectItem>
-                    )}
-                    {(!form.duration_days) && (
-                      <SelectItem value="custom" className="hidden">Elegir...</SelectItem>
-                    )}
+                    <SelectItem value="custom" className="hidden">Personalizado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
