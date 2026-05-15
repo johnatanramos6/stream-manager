@@ -44,7 +44,7 @@ export default function SubscriptionTable({ subscriptions, onEdit, onDelete, onT
     const phone = sub.clientPhone.replace(/\D/g, '');
     if (!phone) return toast.error("El número de teléfono no es válido.");
     
-    const nextDate = getNextPaymentDate(sub.purchaseDate);
+    const nextDate = getNextPaymentDate(sub.purchaseDate, sub.duration_days);
     const formattedDate = nextDate.toLocaleDateString('es-CO', { day: 'numeric', month: 'long' });
 
     const message = `¡Hola, ${sub.clientName}! 👋 Espero que estés muy bien.
@@ -188,9 +188,9 @@ Quedo pendiente 👍`;
           </thead>
           <tbody>
             {sorted.map((sub, i) => {
-              const rowStatus = getRowStatus(sub.purchaseDate);
-              const days = getDaysUntilPayment(sub.purchaseDate);
-              const nextDate = getNextPaymentDate(sub.purchaseDate);
+              const rowStatus = getRowStatus(sub.purchaseDate, sub.duration_days);
+              const days = getDaysUntilPayment(sub.purchaseDate, sub.duration_days);
+              const nextDate = getNextPaymentDate(sub.purchaseDate, sub.duration_days);
               const rowClass = rowStatus === 'danger' ? 'row-danger' : rowStatus === 'warning' ? 'row-warning' : '';
 
               return (
@@ -289,9 +289,9 @@ Quedo pendiente 👍`;
       {/* ── Mobile Card View ── */}
       <div className="md:hidden space-y-3">
         {sorted.map((sub, i) => {
-          const days = getDaysUntilPayment(sub.purchaseDate);
-          const nextDate = getNextPaymentDate(sub.purchaseDate);
-          const rowStatus = getRowStatus(sub.purchaseDate);
+          const days = getDaysUntilPayment(sub.purchaseDate, sub.duration_days);
+          const nextDate = getNextPaymentDate(sub.purchaseDate, sub.duration_days);
+          const rowStatus = getRowStatus(sub.purchaseDate, sub.duration_days);
 
           return (
             <div

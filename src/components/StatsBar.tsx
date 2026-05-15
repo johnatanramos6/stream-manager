@@ -35,7 +35,7 @@ export default function StatsBar({ subscriptions, onStatClick }: Props) {
   const total = subscriptions.length;
   const paid = subscriptions.filter(s => s.paymentStatus === 'pagado').length;
   const owing = subscriptions.filter(s => s.paymentStatus === 'debe' || s.paymentStatus === 'cobrar').length;
-  const urgent = subscriptions.filter(s => getDaysUntilPayment(s.purchaseDate) <= 2).length;
+  const urgent = subscriptions.filter(s => getDaysUntilPayment(s.purchaseDate, s.duration_days) <= 2).length;
 
   const stats = [
     { id: 'all', label: 'Total clientes', value: total, icon: Tv, color: 'text-primary', bg: 'stat-gradient-primary', iconBg: 'bg-primary/10' },

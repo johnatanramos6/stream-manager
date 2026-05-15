@@ -659,7 +659,7 @@ function IndexContent() {
     // Quick filters from Stats
     if (quickFilter === 'pagado' && s.paymentStatus !== 'pagado') return false;
     if (quickFilter === 'debt' && s.paymentStatus !== 'debe' && s.paymentStatus !== 'cobrar') return false;
-    if (quickFilter === 'urgent' && getDaysUntilPayment(s.purchaseDate) > 2) return false;
+    if (quickFilter === 'urgent' && getDaysUntilPayment(s.purchaseDate, s.duration_days) > 2) return false;
 
     return true;
   });
