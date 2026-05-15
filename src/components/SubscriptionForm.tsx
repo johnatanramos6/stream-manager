@@ -40,6 +40,7 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
   const [accountMode, setAccountMode] = useState<'manual' | 'stock'>('manual');
   const [selectedMasterAccountId, setSelectedMasterAccountId] = useState<string>('');
   const [sellFullAccount, setSellFullAccount] = useState(false);
+  const [durationInput, setDurationInput] = useState<string>('30');
 
   const existingAccounts = useMemo(() => {
     const map = new Map<string, { email: string; password: string; accountName: string }>();
@@ -84,6 +85,7 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
       setAccountMode(initial && (initial as any).master_account_id ? 'stock' : 'manual');
       setSelectedMasterAccountId(initial ? (initial as any).master_account_id || '' : '');
       setSellFullAccount(false);
+      setDurationInput(initial ? String(initial.duration_days || 30) : '30');
     }
   }, [open, initial]);
 
@@ -295,14 +297,11 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
                 <Input 
                   type="text" 
                   inputMode="numeric"
-                  value={form.duration_days === undefined || form.duration_days === ('' as any) ? '' : form.duration_days} 
+                  value={durationInput} 
                   onChange={e => {
-                    const val = e.target.value;
-                    if (val === '') {
-                      set('duration_days', '' as any);
-                    } else if (/^\d+$/.test(val)) {
-                      set('duration_days', Number(val));
-                    }
+                    const val = e.target.value.replace(/\D/g, '');
+                    setDurationInput(val);
+                    set('duration_days', val === '' ? ('' as any) : Number(val));
                   }} 
                   required 
                   className="w-16 text-center px-1" 
@@ -310,7 +309,10 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
                 <Select 
                   value={form.duration_days ? String(form.duration_days) : "custom"} 
                   onValueChange={v => {
-                    if (v !== "custom") set('duration_days', Number(v));
+                    if (v !== "custom") {
+                      set('duration_days', Number(v) as any);
+                      setDurationInput(v);
+                    }
                   }}
                 >
                   <SelectTrigger className="flex-1">
