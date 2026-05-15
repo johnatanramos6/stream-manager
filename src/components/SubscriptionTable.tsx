@@ -47,10 +47,12 @@ export default function SubscriptionTable({ subscriptions, onEdit, onDelete, onT
     const nextDate = getNextPaymentDate(sub.purchaseDate);
     const formattedDate = nextDate.toLocaleDateString('es-CO', { day: 'numeric', month: 'long' });
 
-    const message = `¡Hola, ${sub.clientName}! 👋
-Espero que estés muy bien.
+    const message = `¡Hola, ${sub.clientName}! 👋 Espero que estés muy bien.
 
-Te recuerdo que tu suscripción de ${sub.platform} vence el ${formattedDate} 📅
+Te recuerdo que tu suscripción de ${sub.platform}
+📧 correo: ${sub.accountEmail}
+🔐 contraseña: ${sub.accountPassword}
+vence el ${formattedDate} 📅
 
 Para que no pierdas el acceso al contenido, puedes renovarla desde hoy mismo, con tu misma fecha de corte.
 
