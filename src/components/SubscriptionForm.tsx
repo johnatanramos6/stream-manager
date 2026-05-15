@@ -293,22 +293,28 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
               <Label className="text-xs font-semibold">Duración (días) <span className="text-destructive">*</span></Label>
               <div className="flex gap-1">
                 <Input 
-                  type="number" 
-                  min="1" 
-                  value={form.duration_days === '' ? '' : (form.duration_days || '')} 
+                  type="text" 
+                  inputMode="numeric"
+                  value={form.duration_days === undefined || form.duration_days === ('' as any) ? '' : form.duration_days} 
                   onChange={e => {
                     const val = e.target.value;
-                    set('duration_days', val === '' ? ('' as any) : Number(val));
+                    if (val === '') {
+                      set('duration_days', '' as any);
+                    } else if (/^\d+$/.test(val)) {
+                      set('duration_days', Number(val));
+                    }
                   }} 
                   required 
                   className="w-16 text-center px-1" 
                 />
                 <Select 
-                  value={form.duration_days ? String(form.duration_days) : ''} 
-                  onValueChange={v => set('duration_days', Number(v))}
+                  value={form.duration_days ? String(form.duration_days) : "custom"} 
+                  onValueChange={v => {
+                    if (v !== "custom") set('duration_days', Number(v));
+                  }}
                 >
                   <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Personalizado" />
+                    <SelectValue placeholder="Elegir..." />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="25">25 días</SelectItem>
@@ -318,6 +324,9 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
                     <SelectItem value="90">3 Meses (90d)</SelectItem>
                     {form.duration_days && ![25, 28, 30, 60, 90].includes(Number(form.duration_days)) && (
                       <SelectItem value={String(form.duration_days)}>{form.duration_days} días</SelectItem>
+                    )}
+                    {(!form.duration_days) && (
+                      <SelectItem value="custom" className="hidden">Elegir...</SelectItem>
                     )}
                   </SelectContent>
                 </Select>
