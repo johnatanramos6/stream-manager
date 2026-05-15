@@ -17,6 +17,7 @@ export interface Subscription {
   salePriceOverride?: number; // Precio de cobro específico acordado (IPTV combos)
   master_account_id?: string; // Enlace a cuenta maestra de stock
   profiles_sold?: number; // Cantidad de perfiles vendidos (cuenta completa = total_profiles)
+  duration_days?: number; // Duración en días (25, 28, 30=1 mes, 60=2 meses)
 }
 
 // Array removido ya que ahora se obtiene dinámicamente de Pricing.
@@ -35,30 +36,47 @@ export function getPlatformClass(platform: Platform): string {
   return map[platform] || 'platform-default';
 }
 
-export function getNextPaymentDate(purchaseDate: string): Date {
+export function getNextPaymentDate(purchaseDate: string, durationDays: number = 30): Date {
   const purchase = new Date(purchaseDate + 'T12:00:00');
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   const next = new Date(purchase);
   next.setHours(0, 0, 0, 0);
   
-  // Move forward month by month until we PASS today (strictly future)
-  while (next <= now) {
-    next.setMonth(next.getMonth() + 1);
+  if (durationDays === 30) {
+    // Si es exactamente 30, usamos la lógica de meses para que siga siendo el mismo día cada mes (ej: siempre los 15)
+    while (next <= now) {
+      next.setMonth(next.getMonth() + 1);
+    }
+  } else if (durationDays === 60) {
+    // Si es exactamente 60 (2 meses), sumamos de a 2 meses para mantener el día
+    while (next <= now) {
+      next.setMonth(next.getMonth() + 2);
+    }
+  } else if (durationDays === 90) {
+    // 3 meses
+    while (next <= now) {
+      next.setMonth(next.getMonth() + 3);
+    }
+  } else {
+    // Para días específicos (25, 28, etc), sumamos la cantidad exacta de días
+    while (next <= now) {
+      next.setDate(next.getDate() + durationDays);
+    }
   }
   return next;
 }
 
-export function getDaysUntilPayment(purchaseDate: string): number {
-  const next = getNextPaymentDate(purchaseDate);
+export function getDaysUntilPayment(purchaseDate: string, durationDays: number = 30): number {
+  const next = getNextPaymentDate(purchaseDate, durationDays);
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   next.setHours(0, 0, 0, 0);
   return Math.ceil((next.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export function getRowStatus(purchaseDate: string): 'normal' | 'warning' | 'danger' {
-  const days = getDaysUntilPayment(purchaseDate);
+export function getRowStatus(purchaseDate: string, durationDays: number = 30): 'normal' | 'warning' | 'danger' {
+  const days = getDaysUntilPayment(purchaseDate, durationDays);
   if (days <= 0) return 'danger';
   if (days <= 2) return 'warning';
   return 'normal';

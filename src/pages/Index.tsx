@@ -219,7 +219,8 @@ function IndexContent() {
           accountName: d.account_name,
           salePriceOverride: d.sale_price_override,
           master_account_id: d.master_account_id,
-          profiles_sold: d.profiles_sold || 1
+          profiles_sold: d.profiles_sold || 1,
+          duration_days: d.duration_days || 30
         })));
       }
       if (error) toast.error("Error al cargar las suscripciones.");
@@ -540,7 +541,8 @@ function IndexContent() {
       account_name: sub.accountName,
       sale_price_override: sub.salePriceOverride,
       master_account_id: sub.master_account_id || null,
-      profiles_sold: sub.profiles_sold || 1
+      profiles_sold: sub.profiles_sold || 1,
+      duration_days: sub.duration_days || 30
     };
 
     const { error } = await supabase.from('subscriptions').upsert(payload);

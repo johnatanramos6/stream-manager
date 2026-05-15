@@ -31,6 +31,7 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
     paymentStatus: 'debe',
     notes: '',
     accountName: '',
+    duration_days: 30,
   };
 
   const [form, setForm] = useState<Omit<Subscription, 'id'>>(
@@ -283,11 +284,30 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
             <Input type="tel" value={form.clientPhone || ''} onChange={e => set('clientPhone', e.target.value)} placeholder="+57 300 000 0000" />
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Fecha adquisición <span className="text-destructive">*</span></Label>
               <Input type="date" value={form.purchaseDate} onChange={e => set('purchaseDate', e.target.value)} required />
             </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Duración (días) <span className="text-destructive">*</span></Label>
+              <div className="flex gap-1">
+                <Input type="number" min="1" value={form.duration_days || 30} onChange={e => set('duration_days', parseInt(e.target.value) || 30)} required className="w-16 text-center px-1" />
+                <Select value={String(form.duration_days || 30)} onValueChange={v => set('duration_days', parseInt(v))}>
+                  <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="25">25 días</SelectItem>
+                    <SelectItem value="28">28 días</SelectItem>
+                    <SelectItem value="30">1 Mes (30d)</SelectItem>
+                    <SelectItem value="60">2 Meses (60d)</SelectItem>
+                    <SelectItem value="90">3 Meses (90d)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">PIN perfil</Label>
               <Input value={form.profilePin} onChange={e => set('profilePin', e.target.value)} placeholder="1234" />

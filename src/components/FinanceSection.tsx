@@ -114,7 +114,8 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
       
       // Calculate revenue
       const salePrice = p ? p.salePrice : 0;
-      const actualRevenue = sub.salePriceOverride ?? salePrice;
+      const durationMonths = Math.max(1, (sub.duration_days || 30) / 30);
+      const actualRevenue = (sub.salePriceOverride ?? salePrice) / durationMonths;
 
       const ps = platformStatsMap.get(sub.platform) || { accounts: 0, clients: 0, revenue: 0, cost: 0, profit: 0, marginPercent: 0 };
       ps.clients++;
@@ -149,7 +150,7 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
         }
       }
 
-      ps.cost += costForThisSub;
+      ps.cost += costForThisSub / durationMonths;
       platformStatsMap.set(sub.platform, ps);
     });
 
@@ -175,7 +176,8 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
       .filter(s => s.paymentStatus === 'debe' || s.paymentStatus === 'cobrar')
       .reduce((acc, s) => {
         const p = pricingMap.get(s.platform);
-        const actualPrice = s.salePriceOverride ?? (p?.salePrice || 0);
+        const durationMonths = Math.max(1, (s.duration_days || 30) / 30);
+        const actualPrice = (s.salePriceOverride ?? (p?.salePrice || 0)) / durationMonths;
         return acc + actualPrice;
       }, 0);
 
@@ -214,9 +216,9 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
       const uniqueAccounts = new Set<string>();
 
       subsInMonth.forEach(sub => {
-        const p = pricingMap.get(sub.platform);
+        const durationMonths = Math.max(1, (sub.duration_days || 30) / 30);
         const salePrice = p ? p.salePrice : 0;
-        revenue += sub.salePriceOverride ?? salePrice;
+        revenue += (sub.salePriceOverride ?? salePrice) / durationMonths;
 
         const key = sub.accountEmail
           ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}`
@@ -243,7 +245,7 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
             costForThisSub = p?.costPrice || 0;
           }
         }
-        cost += costForThisSub;
+        cost += costForThisSub / durationMonths;
       });
 
       months.push({
