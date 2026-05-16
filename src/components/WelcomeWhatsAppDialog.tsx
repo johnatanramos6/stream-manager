@@ -28,7 +28,8 @@ export default function WelcomeWhatsAppDialog({ open, onClose, subscription }: P
     
     const purchaseD = new Date(subscription.purchaseDate + 'T12:00:00');
     const cutoffDate = new Date(purchaseD);
-    cutoffDate.setDate(cutoffDate.getDate() + 30);
+    const duration = subscription.duration_days || 30;
+    cutoffDate.setDate(cutoffDate.getDate() + duration);
     const cutoffStr = `${cutoffDate.getDate().toString().padStart(2, '0')}/${(cutoffDate.getMonth() + 1).toString().padStart(2, '0')}/${cutoffDate.getFullYear()}`;
 
     const isFullAccount = (subscription.profiles_sold || 1) > 1;
