@@ -32,13 +32,18 @@ export default function Login() {
       const isAdmin = data.user?.email?.toLowerCase() === 'johnatanramos6@gmail.com';
       if (!isAdmin) {
         // Verificar si el vendedor existe y está activo
-        const { data: vendorData, error: vendorError } = await supabase.from('vendors').select('active').eq('email', data.user?.email?.toLowerCase()).single();
+        const { data: vendorData, error: vendorError } = await supabase.from('vendors').select('id, active, auth_user_id').eq('email', data.user?.email?.toLowerCase()).single();
         
         if (!vendorData || vendorError || !vendorData.active) {
           await supabase.auth.signOut();
           toast.error(!vendorData || vendorError ? 'Tu cuenta ha sido eliminada. Contacta al administrador.' : 'Tu cuenta ha sido suspendida. Contacta al administrador.');
           setLoading(false);
           return;
+        }
+
+        // Auto-vincular auth_user_id si fue reactivado
+        if (!vendorData.auth_user_id && data.user) {
+          await supabase.from('vendors').update({ auth_user_id: data.user.id }).eq('id', vendorData.id);
         }
       }
       toast.success('¡Bienvenido a Stream Manager!');

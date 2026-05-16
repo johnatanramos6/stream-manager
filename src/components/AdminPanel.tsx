@@ -55,7 +55,25 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
     });
     
     if (error) {
-      toast.error('Error al crear vendedor: ' + error.message);
+      if (error.message.toLowerCase().includes('already registered')) {
+        // Intentar reactivarlo en la base de datos local
+        const { error: insertError } = await supabase.from('vendors').insert({
+          email: email.toLowerCase(),
+          auth_user_id: null,
+          active: true
+        });
+
+        if (insertError) {
+          toast.error('El vendedor ya existe en el panel o hubo un error al reactivarlo.');
+        } else {
+          toast.success('¡Vendedor reactivado con éxito! El usuario ya existía en el sistema, puede iniciar sesión con su contraseña anterior.');
+          setEmail('');
+          setPassword('');
+          fetchVendors();
+        }
+      } else {
+        toast.error('Error al crear vendedor: ' + error.message);
+      }
     } else {
       // Registrar en la tabla de vendedores
       await supabase.from('vendors').insert({
