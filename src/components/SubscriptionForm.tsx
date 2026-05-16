@@ -161,6 +161,44 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
 
   const hasMasterAccounts = masterAccounts.some(ma => ma.platform === form.platform);
 
+  // ── Calcular fecha de corte a partir de purchaseDate + duration_days ──
+  const computeCutDate = (purchaseDate: string, durationDays: number): string => {
+    if (!purchaseDate) return new Date().toISOString().split('T')[0];
+    const d = new Date(purchaseDate + 'T12:00:00');
+    d.setDate(d.getDate() + durationDays);
+    return d.toISOString().split('T')[0];
+  };
+
+  const cutDate = useMemo(() => {
+    const days = Number(form.duration_days) || 30;
+    return computeCutDate(form.purchaseDate, days);
+  }, [form.purchaseDate, form.duration_days]);
+
+  const handleCutDateChange = (newCutDate: string) => {
+    if (!newCutDate) return;
+    const purchase = new Date(form.purchaseDate + 'T12:00:00');
+    const cut = new Date(newCutDate + 'T12:00:00');
+    const diffMs = cut.getTime() - purchase.getTime();
+    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays > 0) {
+      setForm(prev => ({ ...prev, duration_days: diffDays }));
+    }
+  };
+
+  const handlePurchaseDateChange = (newPurchaseDate: string) => {
+    if (!newPurchaseDate) return;
+    const oldCut = cutDate;
+    const newPurchase = new Date(newPurchaseDate + 'T12:00:00');
+    const cut = new Date(oldCut + 'T12:00:00');
+    const diffMs = cut.getTime() - newPurchase.getTime();
+    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays > 0) {
+      setForm(prev => ({ ...prev, purchaseDate: newPurchaseDate, duration_days: diffDays }));
+    } else {
+      setForm(prev => ({ ...prev, purchaseDate: newPurchaseDate, duration_days: 30 }));
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
@@ -289,44 +327,20 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Fecha adquisición <span className="text-destructive">*</span></Label>
-              <Input type="date" value={form.purchaseDate} onChange={e => set('purchaseDate', e.target.value)} required />
+              <Input type="date" value={form.purchaseDate} onChange={e => handlePurchaseDateChange(e.target.value)} required />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Duración (días) <span className="text-destructive">*</span></Label>
-              <div className="flex gap-1">
+              <Label className="text-xs font-semibold">Fecha de corte <span className="text-destructive">*</span></Label>
+              <div className="flex gap-2 items-center">
                 <Input 
-                  type="text" 
-                  inputMode="numeric"
-                  value={durationInput} 
-                  onChange={e => {
-                    const val = e.target.value.replace(/\D/g, '');
-                    setDurationInput(val);
-                    set('duration_days', val === '' ? ('' as any) : Number(val));
-                  }} 
+                  type="date" 
+                  value={cutDate} 
+                  onChange={e => handleCutDateChange(e.target.value)} 
                   required 
-                  className="w-16 text-center px-1" 
                 />
-                <Select 
-                  value={[25, 28, 30, 60, 90].includes(Number(form.duration_days)) ? String(form.duration_days) : "custom"} 
-                  onValueChange={v => {
-                    if (v !== "custom") {
-                      set('duration_days', Number(v) as any);
-                      setDurationInput(v);
-                    }
-                  }}
-                >
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Elegir..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="25">25 días</SelectItem>
-                    <SelectItem value="28">28 días</SelectItem>
-                    <SelectItem value="30">1 Mes (30d)</SelectItem>
-                    <SelectItem value="60">2 Meses (60d)</SelectItem>
-                    <SelectItem value="90">3 Meses (90d)</SelectItem>
-                    <SelectItem value="custom" className="hidden">Personalizado</SelectItem>
-                  </SelectContent>
-                </Select>
+                <span className="text-xs text-muted-foreground whitespace-nowrap min-w-[50px]">
+                  ({form.duration_days || 30} días)
+                </span>
               </div>
             </div>
           </div>
