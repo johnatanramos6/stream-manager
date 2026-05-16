@@ -43,27 +43,11 @@ export function getNextPaymentDate(purchaseDate: string, durationDays: number = 
   const next = new Date(purchase);
   next.setHours(0, 0, 0, 0);
   
-  if (durationDays === 30) {
-    // Si es exactamente 30, usamos la lógica de meses para que siga siendo el mismo día cada mes (ej: siempre los 15)
-    while (next <= now) {
-      next.setMonth(next.getMonth() + 1);
-    }
-  } else if (durationDays === 60) {
-    // Si es exactamente 60 (2 meses), sumamos de a 2 meses para mantener el día
-    while (next <= now) {
-      next.setMonth(next.getMonth() + 2);
-    }
-  } else if (durationDays === 90) {
-    // 3 meses
-    while (next <= now) {
-      next.setMonth(next.getMonth() + 3);
-    }
-  } else {
-    // Para días específicos (25, 28, etc), sumamos la cantidad exacta de días
-    while (next <= now) {
-      next.setDate(next.getDate() + durationDays);
-    }
+  // Sumamos los días exactos de duración para que coincida siempre con el cálculo de WhatsApp
+  while (next <= now) {
+    next.setDate(next.getDate() + durationDays);
   }
+  
   return next;
 }
 
