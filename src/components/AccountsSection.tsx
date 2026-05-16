@@ -35,30 +35,67 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
   const [showExpiryPanel, setShowExpiryPanel] = useState(false);
 
   // Form state
-  const emptyForm = { platform: dynamicPlatforms[0] || 'Netflix', account_email: '', account_password: '', total_profiles: 4, purchase_price: 0, notes: '', purchase_date: new Date().toISOString().split('T')[0], supplier_phone: '', supplier_name: '' };
+  const emptyForm = { platform: dynamicPlatforms[0] || 'Netflix', account_email: '', account_password: '', total_profiles: 4, purchase_price: 0, notes: '', purchase_date: new Date().toISOString().split('T')[0], supplier_phone: '', supplier_name: '', duration_days: 30 };
   const [form, setForm] = useState(emptyForm);
+
+  const computeCutDate = (purchaseDate: string, durationDays: number): string => {
+    if (!purchaseDate) return new Date().toISOString().split('T')[0];
+    const d = new Date(purchaseDate + 'T12:00:00');
+    d.setDate(d.getDate() + durationDays);
+    return d.toISOString().split('T')[0];
+  };
+
+  const cutDate = useMemo(() => {
+    const days = Number(form.duration_days) || 30;
+    return computeCutDate(form.purchase_date, days);
+  }, [form.purchase_date, form.duration_days]);
+
+  const handleCutDateChange = (newCutDate: string) => {
+    if (!newCutDate) return;
+    const purchase = new Date(form.purchase_date + 'T12:00:00');
+    const cut = new Date(newCutDate + 'T12:00:00');
+    const diffMs = cut.getTime() - purchase.getTime();
+    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays > 0) {
+      setForm(prev => ({ ...prev, duration_days: diffDays }));
+    }
+  };
+
+  const handlePurchaseDateChange = (newPurchaseDate: string) => {
+    if (!newPurchaseDate) return;
+    const oldCut = cutDate;
+    const newPurchase = new Date(newPurchaseDate + 'T12:00:00');
+    const cut = new Date(oldCut + 'T12:00:00');
+    const diffMs = cut.getTime() - newPurchase.getTime();
+    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays > 0) {
+      setForm(prev => ({ ...prev, purchase_date: newPurchaseDate, duration_days: diffDays }));
+    } else {
+      setForm(prev => ({ ...prev, purchase_date: newPurchaseDate, duration_days: 30 }));
+    }
+  };
 
   const getAssignedCount = (accountId: string) => {
     return subscriptions.filter(s => (s as any).master_account_id === accountId)
       .reduce((sum, s) => sum + ((s as any).profiles_sold || 1), 0);
   };
 
-  // Helper: calcular días para vencimiento (purchase_date + 30)
-  const getDaysToExpiry = (purchaseDate?: string): number => {
+  // Helper: calcular días para vencimiento (purchase_date + duration_days)
+  const getDaysToExpiry = (purchaseDate?: string, durationDays: number = 30): number => {
     if (!purchaseDate) return 999;
     const d = new Date(purchaseDate + 'T12:00:00');
     const expiry = new Date(d);
-    expiry.setDate(expiry.getDate() + 30);
+    expiry.setDate(expiry.getDate() + durationDays);
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     expiry.setHours(0, 0, 0, 0);
     return Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   };
 
-  const getExpiryDate = (purchaseDate?: string): string => {
+  const getExpiryDate = (purchaseDate?: string, durationDays: number = 30): string => {
     if (!purchaseDate) return 'N/A';
     const d = new Date(purchaseDate + 'T12:00:00');
-    d.setDate(d.getDate() + 30);
+    d.setDate(d.getDate() + durationDays);
     return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
   };
 
@@ -70,13 +107,13 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
   };
 
   const enrichedAccounts = accounts.map(a => {
-    const daysLeft = getDaysToExpiry(a.purchase_date);
+    const daysLeft = getDaysToExpiry(a.purchase_date, a.duration_days || 30);
     return {
       ...a,
       assigned_profiles: getAssignedCount(a.id),
       available_profiles: a.total_profiles - getAssignedCount(a.id),
       daysToExpiry: daysLeft,
-      expiryDate: getExpiryDate(a.purchase_date),
+      expiryDate: getExpiryDate(a.purchase_date, a.duration_days || 30),
     };
   });
 
@@ -106,6 +143,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
         purchase_date: account.purchase_date || new Date().toISOString().split('T')[0],
         supplier_phone: account.supplier_phone || '',
         supplier_name: account.supplier_name || '',
+        duration_days: account.duration_days || 30,
       });
     } else {
       setEditing(null);
@@ -132,6 +170,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
         purchase_date: form.purchase_date,
         supplier_phone: form.supplier_phone || null,
         supplier_name: form.supplier_name || null,
+        duration_days: form.duration_days,
         notes: form.notes,
       }).eq('id', editing.id);
 
@@ -155,6 +194,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
         purchase_date: form.purchase_date,
         supplier_phone: form.supplier_phone || null,
         supplier_name: form.supplier_name || null,
+        duration_days: form.duration_days,
         notes: form.notes,
       }).select().single();
 
@@ -431,7 +471,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
                       const phone = account.supplier_phone!.replace(/\D/g, '');
                       const provName = account.supplier_name || 'Proveedor';
                       const purchaseD = new Date((account.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
-                      const cutoff = new Date(purchaseD); cutoff.setDate(cutoff.getDate() + 30);
+                      const cutoff = new Date(purchaseD); cutoff.setDate(cutoff.getDate() + (account.duration_days || 30));
                       const fmtDate = (d: Date) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
                       const msg = `Hola\u00A1 ${provName} le escribo por el siguiente servicio de ${account.platform}\n\n\uD83D\uDCE7 Correo: ${account.account_email}\n\uD83D\uDD11 Contrase\u00F1a: ${account.account_password}\n\uD83D\uDDD3\uFE0F Fecha de inicio: ${fmtDate(purchaseD)}\n\u2622\uFE0F Fecha de fin: ${fmtDate(cutoff)}\n\nSolicito soporte ante un inconveniente con el servicio.`;
                       window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`, '_blank');
@@ -500,9 +540,16 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-[10px] text-muted-foreground font-semibold">Fecha de adquisición</Label>
-                  <Input type="date" value={form.purchase_date} onChange={e => setForm(p => ({ ...p, purchase_date: e.target.value }))} required />
+                  <Input type="date" value={form.purchase_date} onChange={e => handlePurchaseDateChange(e.target.value)} required />
                 </div>
                 <div className="space-y-1.5">
+                  <Label className="text-[10px] text-muted-foreground font-semibold flex items-center justify-between">
+                    <span>Fecha de corte</span>
+                    <span className="text-primary opacity-80">({form.duration_days || 30} días)</span>
+                  </Label>
+                  <Input type="date" value={cutDate} onChange={e => handleCutDateChange(e.target.value)} required />
+                </div>
+                <div className="space-y-1.5 col-span-2">
                   <Label className="text-[10px] text-muted-foreground font-semibold">Costo total de la cuenta</Label>
                   <Input type="number" min={0} value={form.purchase_price} onChange={e => setForm(p => ({ ...p, purchase_price: parseInt(e.target.value) || 0 }))} placeholder="Ej: 40000" />
                 </div>
