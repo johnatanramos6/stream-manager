@@ -216,6 +216,7 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
       const uniqueAccounts = new Set<string>();
 
       subsInMonth.forEach(sub => {
+        const p = pricingMap.get(sub.platform);
         const durationMonths = Math.max(1, (sub.duration_days || 30) / 30);
         const salePrice = p ? p.salePrice : 0;
         revenue += (sub.salePriceOverride ?? salePrice) / durationMonths;
