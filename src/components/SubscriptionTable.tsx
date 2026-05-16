@@ -60,7 +60,7 @@ Para que no pierdas el acceso al contenido, puedes renovarla desde hoy mismo, co
 
 Quedo pendiente 👍`;
 
-    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    const url = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
 
