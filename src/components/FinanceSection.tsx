@@ -121,37 +121,37 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
       ps.clients += (sub.profiles_sold || 1);
       ps.revenue += actualRevenue;
 
-      // Grouping logic for accounts
-      const key = sub.accountEmail
-        ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}`
-        : `ungrouped::${sub.id}`;
-
-      const isNewAccount = !uniqueAccounts.has(key);
-      if (isNewAccount) {
-        uniqueAccounts.add(key);
-        ps.accounts++;
-      }
-
-      let costForThisSub = 0;
-      if (sub.master_account_id) {
-        const ma = masterAccountsMap.get(sub.master_account_id);
-        if (ma && ma.total_profiles > 0) {
-          costForThisSub = (ma.purchase_price / ma.total_profiles) * (sub.profiles_sold || 1);
+      // Only count cost if it's a MANUAL subscription
+      if (!sub.master_account_id) {
+        const key = sub.accountEmail ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}` : `ungrouped::${sub.id}`;
+        const isNewAccount = !uniqueAccounts.has(key);
+        if (isNewAccount) {
+          uniqueAccounts.add(key);
+          ps.accounts++;
         }
-      } else {
-        const pConf = pricingMap.get(sub.platform) || { costPrice: 0, salePrice: 0, costType: sub.platform === 'IPTV Premium' ? 'per_account' : 'per_screen' };
+
+        const pConf = p || { costPrice: 0, salePrice: 0, costType: sub.platform === 'IPTV Premium' ? 'per_account' : 'per_screen' };
         const cType = (pConf as any).costType || (sub.platform === 'IPTV Premium' ? 'per_account' : 'per_screen');
+        
+        let costForThisSub = 0;
         if (cType === 'per_account') {
-          if (isNewAccount) {
-            costForThisSub = pConf.costPrice;
-          }
+          if (isNewAccount) costForThisSub = pConf.costPrice;
         } else {
           costForThisSub = pConf.costPrice * (sub.profiles_sold || 1);
         }
+        ps.cost += costForThisSub / durationMonths;
       }
 
-      ps.cost += costForThisSub / durationMonths;
       platformStatsMap.set(sub.platform, ps);
+    });
+
+    // 2. Add Costs and Accounts from Master Accounts
+    masterAccounts.forEach(ma => {
+      const ps = platformStatsMap.get(ma.platform) || { accounts: 0, clients: 0, revenue: 0, cost: 0, profit: 0, marginPercent: 0 };
+      ps.accounts++;
+      const durationMonths = Math.max(1, (ma.duration_days || 30) / 30);
+      ps.cost += ma.purchase_price / durationMonths;
+      platformStatsMap.set(ma.platform, ps);
     });
 
     let totalRevenue = 0;
@@ -215,38 +215,40 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
       let cost = 0;
       const uniqueAccounts = new Set<string>();
 
+
+
+      const maInMonth = masterAccounts.filter(ma => {
+        const d = new Date((ma.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
+        const maStart = new Date(d.getFullYear(), d.getMonth(), 1);
+        const targetMonthDate = new Date(selectedYear, m, 1);
+        return maStart <= targetMonthDate;
+      });
+
       subsInMonth.forEach(sub => {
         const p = pricingMap.get(sub.platform);
         const durationMonths = Math.max(1, (sub.duration_days || 30) / 30);
         const salePrice = p ? p.salePrice : 0;
         revenue += (sub.salePriceOverride ?? (salePrice * (sub.profiles_sold || 1))) / durationMonths;
 
-        const key = sub.accountEmail
-          ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}`
-          : `ungrouped::${sub.id}`;
+        if (!sub.master_account_id) {
+          const key = sub.accountEmail ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}` : `ungrouped::${sub.id}`;
+          const isNewAccount = !uniqueAccounts.has(key);
+          if (isNewAccount) uniqueAccounts.add(key);
 
-        const isNewAccount = !uniqueAccounts.has(key);
-        if (isNewAccount) {
-          uniqueAccounts.add(key);
-        }
-
-        let costForThisSub = 0;
-        if (sub.master_account_id) {
-          const ma = masterAccountsMap.get(sub.master_account_id);
-          if (ma && ma.total_profiles > 0) {
-            costForThisSub = (ma.purchase_price / ma.total_profiles) * (sub.profiles_sold || 1);
-          }
-        } else {
           const cType = (p as any)?.costType || 'per_screen';
+          let costForThisSub = 0;
           if (cType === 'per_account') {
-            if (isNewAccount) {
-              costForThisSub = p?.costPrice || 0;
-            }
+            if (isNewAccount) costForThisSub = p?.costPrice || 0;
           } else {
             costForThisSub = (p?.costPrice || 0) * (sub.profiles_sold || 1);
           }
+          cost += costForThisSub / durationMonths;
         }
-        cost += costForThisSub / durationMonths;
+      });
+
+      maInMonth.forEach(ma => {
+        const durationMonths = Math.max(1, (ma.duration_days || 30) / 30);
+        cost += ma.purchase_price / durationMonths;
       });
 
       months.push({

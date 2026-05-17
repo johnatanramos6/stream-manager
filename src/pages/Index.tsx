@@ -92,30 +92,35 @@ function exportExcel(subs: Subscription[], pricing: PlatformPricing[]) {
       const durationMonths = Math.max(1, (sub.duration_days || 30) / 30);
       revenue += (sub.salePriceOverride ?? (salePrice * (sub.profiles_sold || 1))) / durationMonths;
 
-      const key = sub.accountEmail
-        ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}`
-        : `ungrouped::${sub.id}`;
+      if (!sub.master_account_id) {
+        const key = sub.accountEmail
+          ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}`
+          : `ungrouped::${sub.id}`;
+        
+        const isNewAccount = !uniqueAccounts.has(key);
+        if (isNewAccount) uniqueAccounts.add(key);
 
-      const isNewAccount = !uniqueAccounts.has(key);
-      if (isNewAccount) uniqueAccounts.add(key);
-
-      let costForThisSub = 0;
-      if (sub.master_account_id) {
-        const ma = masterAccountsMap.get(sub.master_account_id);
-        if (ma && ma.total_profiles > 0) {
-          costForThisSub = (ma.purchase_price / ma.total_profiles) * (sub.profiles_sold || 1);
-        }
-      } else {
         const cType = (p as any)?.costType || 'per_screen';
+        let costForThisSub = 0;
         if (cType === 'per_account') {
-          if (isNewAccount) {
-            costForThisSub = p?.costPrice || 0;
-          }
+          if (isNewAccount) costForThisSub = p?.costPrice || 0;
         } else {
           costForThisSub = (p?.costPrice || 0) * (sub.profiles_sold || 1);
         }
+        cost += costForThisSub / durationMonths;
       }
-      cost += costForThisSub / durationMonths;
+    });
+
+    const maInMonth = masterAccounts.filter(ma => {
+      const d = new Date((ma.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
+      const maStart = new Date(d.getFullYear(), d.getMonth(), 1);
+      const targetMonthDate = new Date(currentYear, m, 1);
+      return maStart <= targetMonthDate;
+    });
+
+    maInMonth.forEach(ma => {
+      const durationMonths = Math.max(1, (ma.duration_days || 30) / 30);
+      cost += ma.purchase_price / durationMonths;
     });
 
     const profit = revenue - cost;
@@ -163,35 +168,36 @@ function exportExcel(subs: Subscription[], pricing: PlatformPricing[]) {
     ps.clients += (sub.profiles_sold || 1);
     ps.revenue += actualRevenue;
 
-    const key = sub.accountEmail
-      ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}`
-      : `ungrouped::${sub.id}`;
-      
-    const isNewAccount = !uniqueGlobalAccounts.has(key);
-    if (isNewAccount) {
-      uniqueGlobalAccounts.add(key);
-      ps.accounts++;
-    }
-
-    let costForThisSub = 0;
-    if (sub.master_account_id) {
-      const ma = masterAccountsMap2.get(sub.master_account_id);
-      if (ma && ma.total_profiles > 0) {
-        costForThisSub = (ma.purchase_price / ma.total_profiles) * (sub.profiles_sold || 1);
+    if (!sub.master_account_id) {
+      const key = sub.accountEmail
+        ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}`
+        : `ungrouped::${sub.id}`;
+        
+      const isNewAccount = !uniqueGlobalAccounts.has(key);
+      if (isNewAccount) {
+        uniqueGlobalAccounts.add(key);
+        ps.accounts++;
       }
-    } else {
+
       const cType = (p as any)?.costType || 'per_screen';
+      let costForThisSub = 0;
       if (cType === 'per_account') {
-        if (isNewAccount) {
-          costForThisSub = p?.costPrice || 0;
-        }
+        if (isNewAccount) costForThisSub = p?.costPrice || 0;
       } else {
         costForThisSub = (p?.costPrice || 0) * (sub.profiles_sold || 1);
       }
+      ps.cost += costForThisSub / durationMonths;
     }
-    ps.cost += costForThisSub / durationMonths;
 
     platformStatsMap.set(sub.platform, ps);
+  });
+
+  masterAccounts.forEach(ma => {
+    const ps = platformStatsMap.get(ma.platform) || { accounts: 0, clients: 0, revenue: 0, cost: 0 };
+    ps.accounts++;
+    const durationMonths = Math.max(1, (ma.duration_days || 30) / 30);
+    ps.cost += ma.purchase_price / durationMonths;
+    platformStatsMap.set(ma.platform, ps);
   });
 
   platformStatsMap.forEach((ps, platform) => {
