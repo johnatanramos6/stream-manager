@@ -81,6 +81,7 @@ function exportExcel(subs: Subscription[], pricing: PlatformPricing[]) {
       return subStart <= targetMonth;
     });
 
+    const masterAccountsMap = new Map(masterAccounts.map(ma => [ma.id, ma]));
     let revenue = 0;
     let cost = 0;
     const uniqueAccounts = new Set<string>();
@@ -88,21 +89,33 @@ function exportExcel(subs: Subscription[], pricing: PlatformPricing[]) {
     subsInMonth.forEach(sub => {
       const p = pricingMap.get(sub.platform);
       const salePrice = p ? p.salePrice : 0;
-      revenue += sub.salePriceOverride ?? salePrice;
+      const durationMonths = Math.max(1, (sub.duration_days || 30) / 30);
+      revenue += (sub.salePriceOverride ?? (salePrice * (sub.profiles_sold || 1))) / durationMonths;
 
       const key = sub.accountEmail
         ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}`
         : `ungrouped::${sub.id}`;
 
-      const cType = (p as any)?.costType || 'per_screen';
-      if (cType === 'per_account') {
-        if (!uniqueAccounts.has(key)) {
-          uniqueAccounts.add(key);
-          cost += p?.costPrice || 0;
+      const isNewAccount = !uniqueAccounts.has(key);
+      if (isNewAccount) uniqueAccounts.add(key);
+
+      let costForThisSub = 0;
+      if (sub.master_account_id) {
+        const ma = masterAccountsMap.get(sub.master_account_id);
+        if (ma && ma.total_profiles > 0) {
+          costForThisSub = (ma.purchase_price / ma.total_profiles) * (sub.profiles_sold || 1);
         }
       } else {
-        cost += p?.costPrice || 0;
+        const cType = (p as any)?.costType || 'per_screen';
+        if (cType === 'per_account') {
+          if (isNewAccount) {
+            costForThisSub = p?.costPrice || 0;
+          }
+        } else {
+          costForThisSub = (p?.costPrice || 0) * (sub.profiles_sold || 1);
+        }
       }
+      cost += costForThisSub / durationMonths;
     });
 
     const profit = revenue - cost;
@@ -139,31 +152,51 @@ function exportExcel(subs: Subscription[], pricing: PlatformPricing[]) {
 
   const platformStatsMap = new Map<string, { accounts: number; clients: number; revenue: number; cost: number }>();
   const uniqueGlobalAccounts = new Set<string>();
+  const masterAccountsMap2 = new Map(masterAccounts.map(ma => [ma.id, ma]));
 
   subs.forEach(sub => {
     const p = pricingMap.get(sub.platform);
     const salePrice = p ? p.salePrice : 0;
-    const actualRevenue = sub.salePriceOverride ?? salePrice;
+    const durationMonths = Math.max(1, (sub.duration_days || 30) / 30);
+    const actualRevenue = (sub.salePriceOverride ?? (salePrice * (sub.profiles_sold || 1))) / durationMonths;
     const ps = platformStatsMap.get(sub.platform) || { accounts: 0, clients: 0, revenue: 0, cost: 0 };
-    ps.clients++;
+    ps.clients += (sub.profiles_sold || 1);
     ps.revenue += actualRevenue;
 
     const key = sub.accountEmail
       ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}`
       : `ungrouped::${sub.id}`;
-    if (!uniqueGlobalAccounts.has(key)) {
+      
+    const isNewAccount = !uniqueGlobalAccounts.has(key);
+    if (isNewAccount) {
       uniqueGlobalAccounts.add(key);
       ps.accounts++;
     }
+
+    let costForThisSub = 0;
+    if (sub.master_account_id) {
+      const ma = masterAccountsMap2.get(sub.master_account_id);
+      if (ma && ma.total_profiles > 0) {
+        costForThisSub = (ma.purchase_price / ma.total_profiles) * (sub.profiles_sold || 1);
+      }
+    } else {
+      const cType = (p as any)?.costType || 'per_screen';
+      if (cType === 'per_account') {
+        if (isNewAccount) {
+          costForThisSub = p?.costPrice || 0;
+        }
+      } else {
+        costForThisSub = (p?.costPrice || 0) * (sub.profiles_sold || 1);
+      }
+    }
+    ps.cost += costForThisSub / durationMonths;
+
     platformStatsMap.set(sub.platform, ps);
   });
 
   platformStatsMap.forEach((ps, platform) => {
-    const p = pricingMap.get(platform) || { costPrice: 0, costType: 'per_screen' };
-    const cType = (p as any).costType || 'per_screen';
-    const totalCostPlat = cType === 'per_account' ? (ps.accounts * p.costPrice) : (ps.clients * p.costPrice);
-    const profit = ps.revenue - totalCostPlat;
-    financeRows.push([platform, ps.accounts, ps.clients, totalCostPlat, ps.revenue, profit]);
+    const profit = ps.revenue - ps.cost;
+    financeRows.push([platform, ps.accounts, ps.clients, ps.cost, ps.revenue, profit]);
   });
 
   const wsFinance = XLSX.utils.aoa_to_sheet([financeHeaders, ...financeRows]);

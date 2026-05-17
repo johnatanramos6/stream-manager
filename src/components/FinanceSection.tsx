@@ -115,10 +115,10 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
       // Calculate revenue
       const salePrice = p ? p.salePrice : 0;
       const durationMonths = Math.max(1, (sub.duration_days || 30) / 30);
-      const actualRevenue = (sub.salePriceOverride ?? salePrice) / durationMonths;
+      const actualRevenue = (sub.salePriceOverride ?? (salePrice * (sub.profiles_sold || 1))) / durationMonths;
 
       const ps = platformStatsMap.get(sub.platform) || { accounts: 0, clients: 0, revenue: 0, cost: 0, profit: 0, marginPercent: 0 };
-      ps.clients++;
+      ps.clients += (sub.profiles_sold || 1);
       ps.revenue += actualRevenue;
 
       // Grouping logic for accounts
@@ -136,7 +136,7 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
       if (sub.master_account_id) {
         const ma = masterAccountsMap.get(sub.master_account_id);
         if (ma && ma.total_profiles > 0) {
-          costForThisSub = ma.purchase_price / ma.total_profiles;
+          costForThisSub = (ma.purchase_price / ma.total_profiles) * (sub.profiles_sold || 1);
         }
       } else {
         const pConf = pricingMap.get(sub.platform) || { costPrice: 0, salePrice: 0, costType: sub.platform === 'IPTV Premium' ? 'per_account' : 'per_screen' };
@@ -146,7 +146,7 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
             costForThisSub = pConf.costPrice;
           }
         } else {
-          costForThisSub = pConf.costPrice;
+          costForThisSub = pConf.costPrice * (sub.profiles_sold || 1);
         }
       }
 
@@ -177,7 +177,7 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
       .reduce((acc, s) => {
         const p = pricingMap.get(s.platform);
         const durationMonths = Math.max(1, (s.duration_days || 30) / 30);
-        const actualPrice = (s.salePriceOverride ?? (p?.salePrice || 0)) / durationMonths;
+        const actualPrice = (s.salePriceOverride ?? ((p?.salePrice || 0) * (s.profiles_sold || 1))) / durationMonths;
         return acc + actualPrice;
       }, 0);
 
@@ -219,7 +219,7 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
         const p = pricingMap.get(sub.platform);
         const durationMonths = Math.max(1, (sub.duration_days || 30) / 30);
         const salePrice = p ? p.salePrice : 0;
-        revenue += (sub.salePriceOverride ?? salePrice) / durationMonths;
+        revenue += (sub.salePriceOverride ?? (salePrice * (sub.profiles_sold || 1))) / durationMonths;
 
         const key = sub.accountEmail
           ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}`
@@ -234,7 +234,7 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
         if (sub.master_account_id) {
           const ma = masterAccountsMap.get(sub.master_account_id);
           if (ma && ma.total_profiles > 0) {
-            costForThisSub = ma.purchase_price / ma.total_profiles;
+            costForThisSub = (ma.purchase_price / ma.total_profiles) * (sub.profiles_sold || 1);
           }
         } else {
           const cType = (p as any)?.costType || 'per_screen';
@@ -243,7 +243,7 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
               costForThisSub = p?.costPrice || 0;
             }
           } else {
-            costForThisSub = p?.costPrice || 0;
+            costForThisSub = (p?.costPrice || 0) * (sub.profiles_sold || 1);
           }
         }
         cost += costForThisSub / durationMonths;
