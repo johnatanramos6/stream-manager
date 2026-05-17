@@ -181,7 +181,9 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
         return acc + actualPrice;
       }, 0);
 
-    return { totalRevenue, totalCost, totalProfit: totalRevenue - totalCost, platformStats, totalClients: subscriptions.length, pendingCount, pendingAmount };
+    const totalClientsSum = subscriptions.reduce((acc, sub) => acc + (sub.profiles_sold || 1), 0);
+
+    return { totalRevenue, totalCost, totalProfit: totalRevenue - totalCost, platformStats, totalClients: totalClientsSum, pendingCount, pendingAmount };
   }, [subscriptions, pricing]);
 
   const chartData = stats.platformStats.map(ps => ({
