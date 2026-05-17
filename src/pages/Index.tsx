@@ -209,9 +209,22 @@ function exportExcel(subs: Subscription[], pricing: PlatformPricing[]) {
   wsFinance['!cols'] = [{ wch: 25 }, { wch: 18 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 12 }];
   XLSX.utils.book_append_sheet(wb, wsFinance, 'Resumen Financiero');
 
-  // Descargar
-  XLSX.writeFile(wb, `StreamManager_${new Date().toISOString().split('T')[0]}.xlsx`);
-  toast.success('Reporte Excel descargado con éxito');
+  try {
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/octet-stream' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `StreamManager_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    toast.success('Reporte Excel descargado con éxito');
+  } catch (error) {
+    console.error('Error exporting Excel:', error);
+    toast.error('Error al generar el Excel. Intenta desde otro navegador.');
+  }
 }
 
 function IndexContent() {
