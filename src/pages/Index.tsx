@@ -29,7 +29,7 @@ import AdminPanel from '@/components/AdminPanel';
 // Deprecated local storage methods removed.
 // We keep exportCSV standard since it's pure logic.
 
-function exportExcel(subs: Subscription[], pricing: PlatformPricing[]) {
+function exportExcel(subs: Subscription[], masterAccounts: MasterAccount[], pricing: PlatformPricing[]) {
   const wb = XLSX.utils.book_new();
 
   // ═══════════════════════════════════════════
@@ -210,16 +210,8 @@ function exportExcel(subs: Subscription[], pricing: PlatformPricing[]) {
   XLSX.utils.book_append_sheet(wb, wsFinance, 'Resumen Financiero');
 
   try {
-    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([wbout], { type: 'application/octet-stream' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `StreamManager_${new Date().toISOString().split('T')[0]}.xlsx`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    const filename = `StreamManager_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, filename);
     toast.success('Reporte Excel descargado con éxito');
   } catch (error) {
     console.error('Error exporting Excel:', error);
@@ -780,7 +772,7 @@ function IndexContent() {
                 <Button variant="outline" size="sm" className="flex gap-1.5 px-2 sm:px-3 text-xs" onClick={() => fileInputRef.current?.click()} title="Importar Excel/CSV">
                   <Upload className="h-4 w-4 sm:h-3.5 sm:w-3.5" /> <span className="hidden lg:inline">Importar</span>
                 </Button>
-                <Button variant="outline" size="sm" className="flex gap-1.5 px-2 sm:px-3 text-xs" onClick={() => exportExcel(subs, pricingConfig)}>
+                <Button variant="outline" size="sm" className="flex gap-1.5 px-2 sm:px-3 text-xs" onClick={() => exportExcel(subs, masterAccounts, pricingConfig)}>
                   <Download className="h-4 w-4 sm:h-3.5 sm:w-3.5" /> <span className="hidden sm:inline">Descargar Excel</span>
                 </Button>
                 <Button onClick={() => { setEditing(null); setFormOpen(true); }} className="gap-1.5 text-xs hidden sm:flex shadow-lg shadow-primary/20">
