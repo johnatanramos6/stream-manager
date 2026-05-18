@@ -283,7 +283,7 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
                           <Users className="h-3.5 w-3.5 text-primary" />
                           <div>
                             <p className="text-xs font-semibold">Vender cuenta completa ({ma.total_profiles} perfiles)</p>
-                            <p className="text-[10px] text-muted-foreground">Se crearán {ma.total_profiles} suscripciones para el mismo cliente</p>
+                            <p className="text-[10px] text-muted-foreground">Se registrará una venta por {ma.total_profiles} perfiles para el mismo cliente</p>
                           </div>
                         </div>
                       </div>

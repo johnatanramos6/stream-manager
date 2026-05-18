@@ -25,6 +25,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import Login from '@/components/Login';
 import AdminPanel from '@/components/AdminPanel';
+import { calculateCurrentFinancialStats, calculateMonthlyFinancialSnapshots, FINANCE_MONTH_FULL } from '@/lib/finance';
 
 // Deprecated local storage methods removed.
 // We keep exportCSV standard since it's pure logic.
@@ -64,65 +65,19 @@ function exportExcel(subs: Subscription[], masterAccounts: MasterAccount[], pric
   // ═══════════════════════════════════════════
   // HOJA 3: Resumen Financiero Mensual
   // ═══════════════════════════════════════════
-  const pricingMap = new Map(pricing.map(p => [p.platform, p]));
-  const MONTH_NAMES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth();
+  const monthlySnapshots = calculateMonthlyFinancialSnapshots(subs, masterAccounts, pricing, currentYear);
+  const currentStats = calculateCurrentFinancialStats(subs, masterAccounts, pricing);
 
   const financeHeaders = ['Mes', 'Clientes Activos', 'Ingresos ($)', 'Costos ($)', 'Ganancia Neta ($)', 'Margen (%)'];
   const financeRows: (string | number)[][] = [];
   let totalIngresos = 0, totalCostos = 0, totalGanancia = 0;
 
   for (let m = 0; m <= currentMonth; m++) {
-    const subsInMonth = subs.filter(sub => {
-      const d = new Date(sub.purchaseDate + 'T12:00:00');
-      const subStart = new Date(d.getFullYear(), d.getMonth(), 1);
-      const targetMonth = new Date(currentYear, m, 1);
-      return subStart <= targetMonth;
-    });
-
-    const masterAccountsMap = new Map(masterAccounts.map(ma => [ma.id, ma]));
-    let revenue = 0;
-    let cost = 0;
-    const uniqueAccounts = new Set<string>();
-
-    subsInMonth.forEach(sub => {
-      const p = pricingMap.get(sub.platform);
-      const salePrice = p ? p.salePrice : 0;
-      const durationMonths = Math.max(1, (sub.duration_days || 30) / 30);
-      revenue += (sub.salePriceOverride ?? (salePrice * (sub.profiles_sold || 1))) / durationMonths;
-
-      if (!sub.master_account_id) {
-        const key = sub.accountEmail
-          ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}`
-          : `ungrouped::${sub.id}`;
-        
-        const isNewAccount = !uniqueAccounts.has(key);
-        if (isNewAccount) uniqueAccounts.add(key);
-
-        const cType = (p as any)?.costType || 'per_screen';
-        let costForThisSub = 0;
-        if (cType === 'per_account') {
-          if (isNewAccount) costForThisSub = p?.costPrice || 0;
-        } else {
-          costForThisSub = (p?.costPrice || 0) * (sub.profiles_sold || 1);
-        }
-        cost += costForThisSub / durationMonths;
-      }
-    });
-
-    const maInMonth = masterAccounts.filter(ma => {
-      const d = new Date((ma.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
-      const maStart = new Date(d.getFullYear(), d.getMonth(), 1);
-      const targetMonthDate = new Date(currentYear, m, 1);
-      return maStart <= targetMonthDate;
-    });
-
-    maInMonth.forEach(ma => {
-      const durationMonths = Math.max(1, (ma.duration_days || 30) / 30);
-      cost += ma.purchase_price / durationMonths;
-    });
-
+    const snapshot = monthlySnapshots[m];
+    const revenue = snapshot.Ingresos || 0;
+    const cost = snapshot.Costos || 0;
     const profit = revenue - cost;
     const margin = revenue > 0 ? ((profit / revenue) * 100) : 0;
     totalIngresos += revenue;
@@ -130,8 +85,8 @@ function exportExcel(subs: Subscription[], masterAccounts: MasterAccount[], pric
     totalGanancia += profit;
 
     financeRows.push([
-      MONTH_NAMES_FULL[m],
-      subsInMonth.length,
+      FINANCE_MONTH_FULL[m],
+      snapshot.clients,
       revenue,
       cost,
       profit,
@@ -155,54 +110,8 @@ function exportExcel(subs: Subscription[], masterAccounts: MasterAccount[], pric
   financeRows.push(['--- DETALLE POR PLATAFORMA ---', '', '', '', '', '']);
   financeRows.push(['Plataforma', 'Cuentas', 'Pantallas', 'Costo Total ($)', 'Ingreso Total ($)', 'Ganancia Neta ($)']);
 
-  const platformStatsMap = new Map<string, { accounts: number; clients: number; revenue: number; cost: number }>();
-  const uniqueGlobalAccounts = new Set<string>();
-  const masterAccountsMap2 = new Map(masterAccounts.map(ma => [ma.id, ma]));
-
-  subs.forEach(sub => {
-    const p = pricingMap.get(sub.platform);
-    const salePrice = p ? p.salePrice : 0;
-    const durationMonths = Math.max(1, (sub.duration_days || 30) / 30);
-    const actualRevenue = (sub.salePriceOverride ?? (salePrice * (sub.profiles_sold || 1))) / durationMonths;
-    const ps = platformStatsMap.get(sub.platform) || { accounts: 0, clients: 0, revenue: 0, cost: 0 };
-    ps.clients += (sub.profiles_sold || 1);
-    ps.revenue += actualRevenue;
-
-    if (!sub.master_account_id) {
-      const key = sub.accountEmail
-        ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}`
-        : `ungrouped::${sub.id}`;
-        
-      const isNewAccount = !uniqueGlobalAccounts.has(key);
-      if (isNewAccount) {
-        uniqueGlobalAccounts.add(key);
-        ps.accounts++;
-      }
-
-      const cType = (p as any)?.costType || 'per_screen';
-      let costForThisSub = 0;
-      if (cType === 'per_account') {
-        if (isNewAccount) costForThisSub = p?.costPrice || 0;
-      } else {
-        costForThisSub = (p?.costPrice || 0) * (sub.profiles_sold || 1);
-      }
-      ps.cost += costForThisSub / durationMonths;
-    }
-
-    platformStatsMap.set(sub.platform, ps);
-  });
-
-  masterAccounts.forEach(ma => {
-    const ps = platformStatsMap.get(ma.platform) || { accounts: 0, clients: 0, revenue: 0, cost: 0 };
-    ps.accounts++;
-    const durationMonths = Math.max(1, (ma.duration_days || 30) / 30);
-    ps.cost += ma.purchase_price / durationMonths;
-    platformStatsMap.set(ma.platform, ps);
-  });
-
-  platformStatsMap.forEach((ps, platform) => {
-    const profit = ps.revenue - ps.cost;
-    financeRows.push([platform, ps.accounts, ps.clients, ps.cost, ps.revenue, profit]);
+  currentStats.platformStats.forEach(ps => {
+    financeRows.push([ps.platform, ps.accounts, ps.clients, ps.cost, ps.revenue, ps.profit]);
   });
 
   const wsFinance = XLSX.utils.aoa_to_sheet([financeHeaders, ...financeRows]);
