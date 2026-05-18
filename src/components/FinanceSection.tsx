@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { DollarSign, TrendingUp, TrendingDown, Users, Monitor, Save, AlertCircle, Plus, X, ChevronLeft, ChevronRight, CalendarDays, Loader2 } from 'lucide-react';
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
 import { MasterAccount } from '@/types/masterAccount';
+import { calculateCurrentFinancialStats, calculateMonthlyFinancialSnapshots, FINANCE_MONTH_FULL, FINANCE_MONTH_NAMES } from '@/lib/finance';
 
 interface Props {
   subscriptions: Subscription[];
@@ -39,9 +40,6 @@ const getPlatformBrandColor = (name: string) => {
   const fallbacks = ['#4f46e5', '#06b6d4', '#8b5cf6', '#84cc16', '#f59e0b', '#ec4899', '#64748b'];
   return fallbacks[Math.abs(hash) % fallbacks.length];
 };
-
-const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-const MONTH_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 export default function FinanceSection({ subscriptions, masterAccounts, onPricingSaved }: Props) {
   const { user } = useAuth();
@@ -103,88 +101,8 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
   };
 
   const stats = useMemo(() => {
-    const pricingMap = new Map(pricing.map(p => [p.platform, p]));
-    const masterAccountsMap = new Map(masterAccounts.map(ma => [ma.id, ma]));
-
-    const platformStatsMap = new Map<string, { accounts: number; clients: number; revenue: number; cost: number; profit: number; marginPercent: number }>();
-    const uniqueAccounts = new Set<string>();
-
-    subscriptions.forEach(sub => {
-      const p = pricingMap.get(sub.platform);
-      
-      // Calculate revenue
-      const salePrice = p ? p.salePrice : 0;
-      const durationMonths = Math.max(1, (sub.duration_days || 30) / 30);
-      const actualRevenue = (sub.salePriceOverride ?? (salePrice * (sub.profiles_sold || 1))) / durationMonths;
-
-      const ps = platformStatsMap.get(sub.platform) || { accounts: 0, clients: 0, revenue: 0, cost: 0, profit: 0, marginPercent: 0 };
-      ps.clients += (sub.profiles_sold || 1);
-      ps.revenue += actualRevenue;
-
-      // Only count cost if it's a MANUAL subscription
-      if (!sub.master_account_id) {
-        const key = sub.accountEmail ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}` : `ungrouped::${sub.id}`;
-        const isNewAccount = !uniqueAccounts.has(key);
-        if (isNewAccount) {
-          uniqueAccounts.add(key);
-          ps.accounts++;
-        }
-
-        const pConf = p || { costPrice: 0, salePrice: 0, costType: sub.platform === 'IPTV Premium' ? 'per_account' : 'per_screen' };
-        const cType = (pConf as any).costType || (sub.platform === 'IPTV Premium' ? 'per_account' : 'per_screen');
-        
-        let costForThisSub = 0;
-        if (cType === 'per_account') {
-          if (isNewAccount) costForThisSub = pConf.costPrice;
-        } else {
-          costForThisSub = pConf.costPrice * (sub.profiles_sold || 1);
-        }
-        ps.cost += costForThisSub / durationMonths;
-      }
-
-      platformStatsMap.set(sub.platform, ps);
-    });
-
-    // 2. Add Costs and Accounts from Master Accounts
-    masterAccounts.forEach(ma => {
-      const ps = platformStatsMap.get(ma.platform) || { accounts: 0, clients: 0, revenue: 0, cost: 0, profit: 0, marginPercent: 0 };
-      ps.accounts++;
-      const durationMonths = Math.max(1, (ma.duration_days || 30) / 30);
-      ps.cost += ma.purchase_price / durationMonths;
-      platformStatsMap.set(ma.platform, ps);
-    });
-
-    let totalRevenue = 0;
-    let totalCost = 0;
-    const platformStats: { platform: string; accounts: number; clients: number; cost: number; revenue: number; profit: number; marginPercent: number }[] = [];
-
-    platformStatsMap.forEach((ps, platform) => {
-      ps.profit = ps.revenue - ps.cost;
-      ps.marginPercent = ps.revenue > 0 ? (ps.profit / ps.revenue) * 100 : 0;
-
-      totalCost += ps.cost;
-      totalRevenue += ps.revenue;
-
-      platformStats.push({ platform, ...ps });
-    });
-
-    platformStats.sort((a, b) => b.profit - a.profit);
-
-    // Pending collections
-    const pendingCount = subscriptions.filter(s => s.paymentStatus === 'debe' || s.paymentStatus === 'cobrar').length;
-    const pendingAmount = subscriptions
-      .filter(s => s.paymentStatus === 'debe' || s.paymentStatus === 'cobrar')
-      .reduce((acc, s) => {
-        const p = pricingMap.get(s.platform);
-        const durationMonths = Math.max(1, (s.duration_days || 30) / 30);
-        const actualPrice = (s.salePriceOverride ?? ((p?.salePrice || 0) * (s.profiles_sold || 1))) / durationMonths;
-        return acc + actualPrice;
-      }, 0);
-
-    const totalClientsSum = subscriptions.reduce((acc, sub) => acc + (sub.profiles_sold || 1), 0);
-
-    return { totalRevenue, totalCost, totalProfit: totalRevenue - totalCost, platformStats, totalClients: totalClientsSum, pendingCount, pendingAmount };
-  }, [subscriptions, pricing]);
+    return calculateCurrentFinancialStats(subscriptions, masterAccounts, pricing);
+  }, [subscriptions, masterAccounts, pricing]);
 
   const chartData = stats.platformStats.map(ps => ({
     name: ps.platform.length > 12 ? ps.platform.substring(0, 10) + '…' : ps.platform,
@@ -195,79 +113,9 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
 
   // ── Datos mensuales para el gráfico de tendencia ──
   const currentMonthIdx = new Date().getMonth();
-  const isCurrentYear = selectedYear === new Date().getFullYear();
-  const lastRealMonth = isCurrentYear ? currentMonthIdx : 11;
-
   const monthlyData = useMemo(() => {
-    const pricingMap = new Map(pricing.map(p => [p.platform, p]));
-    const masterAccountsMap = new Map(masterAccounts.map(ma => [ma.id, ma]));
-    const months: { month: string; monthFull: string; Ingresos: number | null; Costos: number | null; Ganancia: number | null; IngresosProj: number | null; CostosProj: number | null; GananciaProj: number | null; clients: number; isFuture: boolean }[] = [];
-
-    for (let m = 0; m < 12; m++) {
-      const isFuture = isCurrentYear && m > currentMonthIdx;
-
-      const subsInMonth = subscriptions.filter(sub => {
-        const d = new Date(sub.purchaseDate + 'T12:00:00');
-        const subStart = new Date(d.getFullYear(), d.getMonth(), 1);
-        const targetMonth = new Date(selectedYear, m, 1);
-        return subStart <= targetMonth;
-      });
-
-      let revenue = 0;
-      let cost = 0;
-      const uniqueAccounts = new Set<string>();
-
-
-
-      const maInMonth = masterAccounts.filter(ma => {
-        const d = new Date((ma.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
-        const maStart = new Date(d.getFullYear(), d.getMonth(), 1);
-        const targetMonthDate = new Date(selectedYear, m, 1);
-        return maStart <= targetMonthDate;
-      });
-
-      subsInMonth.forEach(sub => {
-        const p = pricingMap.get(sub.platform);
-        const durationMonths = Math.max(1, (sub.duration_days || 30) / 30);
-        const salePrice = p ? p.salePrice : 0;
-        revenue += (sub.salePriceOverride ?? (salePrice * (sub.profiles_sold || 1))) / durationMonths;
-
-        if (!sub.master_account_id) {
-          const key = sub.accountEmail ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}` : `ungrouped::${sub.id}`;
-          const isNewAccount = !uniqueAccounts.has(key);
-          if (isNewAccount) uniqueAccounts.add(key);
-
-          const cType = (p as any)?.costType || 'per_screen';
-          let costForThisSub = 0;
-          if (cType === 'per_account') {
-            if (isNewAccount) costForThisSub = p?.costPrice || 0;
-          } else {
-            costForThisSub = (p?.costPrice || 0) * (sub.profiles_sold || 1);
-          }
-          cost += costForThisSub / durationMonths;
-        }
-      });
-
-      maInMonth.forEach(ma => {
-        const durationMonths = Math.max(1, (ma.duration_days || 30) / 30);
-        cost += ma.purchase_price / durationMonths;
-      });
-
-      months.push({
-        month: MONTH_NAMES[m],
-        monthFull: MONTH_FULL[m],
-        Ingresos: !isFuture ? revenue : null,
-        Costos: !isFuture ? cost : null,
-        Ganancia: !isFuture ? revenue - cost : null,
-        IngresosProj: (m === lastRealMonth || isFuture) ? revenue : null,
-        CostosProj: (m === lastRealMonth || isFuture) ? cost : null,
-        GananciaProj: (m === lastRealMonth || isFuture) ? revenue - cost : null,
-        clients: subsInMonth.length,
-        isFuture
-      });
-    }
-    return months;
-  }, [subscriptions, pricing, selectedYear, currentMonthIdx, isCurrentYear, lastRealMonth]);
+    return calculateMonthlyFinancialSnapshots(subscriptions, masterAccounts, pricing, selectedYear);
+  }, [subscriptions, masterAccounts, pricing, selectedYear]);
 
   // Solo sumar meses reales (no futuros) para el total anual
   const realMonths = monthlyData.filter(m => !m.isFuture);
@@ -356,14 +204,14 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
           </div>
           <div className="text-center p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
             <p className="text-lg sm:text-xl font-bold text-blue-600 dark:text-blue-400">{formatCOP(currentMonthRevenue)}</p>
-            <p className="text-[10px] text-muted-foreground">{MONTH_FULL[currentMonthIdx]} (actual)</p>
+            <p className="text-[10px] text-muted-foreground">{FINANCE_MONTH_FULL[currentMonthIdx]} (actual)</p>
           </div>
           <div className={`text-center p-3 rounded-lg border ${isGrowing ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-red-500/5 border-red-500/10'}`}>
             <p className={`text-lg sm:text-xl font-bold flex items-center justify-center gap-1 ${isGrowing ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
               {isGrowing ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
               {prevMonthRevenue > 0 ? `${trendPercent > 0 ? '+' : ''}${trendPercent.toFixed(1)}%` : '—'}
             </p>
-            <p className="text-[10px] text-muted-foreground">vs. {currentMonthIdx > 0 ? MONTH_FULL[currentMonthIdx - 1] : '—'}</p>
+            <p className="text-[10px] text-muted-foreground">vs. {currentMonthIdx > 0 ? FINANCE_MONTH_FULL[currentMonthIdx - 1] : '—'}</p>
           </div>
         </div>
 
@@ -396,7 +244,7 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
                   const icon = cleanName === 'Ingresos' ? '💰' : cleanName === 'Ganancia' ? '📈' : '📉';
                   return [formatCOP(value), `${icon} ${cleanName}${isProj ? ' (proyección)' : ''}`];
                 }}
-                labelFormatter={(label) => `${MONTH_FULL[MONTH_NAMES.indexOf(label)]} ${selectedYear}`}
+                labelFormatter={(label) => `${FINANCE_MONTH_FULL[FINANCE_MONTH_NAMES.indexOf(label)]} ${selectedYear}`}
               />
               {/* Líneas reales (sólidas) */}
               <Area type="monotone" dataKey="Ingresos" stroke="hsl(var(--primary))" strokeWidth={2.5} fill="url(#gradIngresos)" dot={{ r: 3, fill: 'hsl(var(--primary))' }} activeDot={{ r: 5 }} connectNulls={false} />
