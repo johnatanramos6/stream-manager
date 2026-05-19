@@ -7,6 +7,7 @@ export interface PlatformFinancialStats {
   accounts: number;
   clients: number;
   cost: number;
+  soldCost: number;
   revenue: number;
   profit: number;
   marginPercent: number;
@@ -72,6 +73,10 @@ export const getStockSubscriptionCost = (sub: Subscription, masterAccount?: Mast
   return (costPerProfile * soldProfiles) / durationMonths;
 };
 
+export const getMasterAccountMonthlyCost = (masterAccount: MasterAccount) => {
+  return masterAccount.purchase_price / getDurationMonths(masterAccount.duration_days);
+};
+
 const getManualAccountKey = (sub: Subscription) => {
   return sub.accountEmail
     ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}`
@@ -98,7 +103,7 @@ export function calculateCurrentFinancialStats(
     const current = platformStatsMap.get(platform);
     if (current) return current;
 
-    const created = { platform, accounts: 0, clients: 0, revenue: 0, cost: 0, profit: 0, marginPercent: 0 };
+    const created = { platform, accounts: 0, clients: 0, revenue: 0, cost: 0, soldCost: 0, profit: 0, marginPercent: 0 };
     platformStatsMap.set(platform, created);
     return created;
   };
@@ -112,7 +117,7 @@ export function calculateCurrentFinancialStats(
 
     if (sub.master_account_id) {
       const masterAccount = masterAccountsMap.get(sub.master_account_id);
-      stats.cost += getStockSubscriptionCost(sub, masterAccount);
+      stats.soldCost += getStockSubscriptionCost(sub, masterAccount);
 
       if (masterAccount && !countedMasterAccounts.has(masterAccount.id)) {
         countedMasterAccounts.add(masterAccount.id);
@@ -128,11 +133,14 @@ export function calculateCurrentFinancialStats(
       stats.accounts++;
     }
 
-    stats.cost += getManualSubscriptionCost(sub, pricingConfig, isNewAccount);
+    const manualCost = getManualSubscriptionCost(sub, pricingConfig, isNewAccount);
+    stats.cost += manualCost;
+    stats.soldCost += manualCost;
   });
 
   masterAccounts.forEach(ma => {
     const stats = getPlatformStats(ma.platform);
+    stats.cost += getMasterAccountMonthlyCost(ma);
     if (!countedMasterAccounts.has(ma.id)) {
       countedMasterAccounts.add(ma.id);
       stats.accounts++;
@@ -141,11 +149,13 @@ export function calculateCurrentFinancialStats(
 
   let totalRevenue = 0;
   let totalCost = 0;
+  let totalSoldCost = 0;
   const platformStats = Array.from(platformStatsMap.values()).map(stats => {
-    const profit = stats.revenue - stats.cost;
+    const profit = stats.revenue - stats.soldCost;
     const marginPercent = stats.revenue > 0 ? (profit / stats.revenue) * 100 : 0;
     totalRevenue += stats.revenue;
     totalCost += stats.cost;
+    totalSoldCost += stats.soldCost;
     return { ...stats, profit, marginPercent };
   }).sort((a, b) => b.profit - a.profit);
 
@@ -157,7 +167,7 @@ export function calculateCurrentFinancialStats(
   return {
     totalRevenue,
     totalCost,
-    totalProfit: totalRevenue - totalCost,
+    totalProfit: totalRevenue - totalSoldCost,
     platformStats,
     totalClients: subscriptions.reduce((acc, sub) => acc + getProfilesSold(sub), 0),
     pendingCount: pendingSubscriptions.length,
@@ -182,27 +192,34 @@ export function calculateMonthlyFinancialSnapshots(
     const isFuture = isCurrentYear && index > currentMonthIdx;
     const targetMonth = new Date(selectedYear, index, 1);
     const subsInMonth = subscriptions.filter(sub => getMonthStartFromDate(sub.purchaseDate) <= targetMonth);
+    const maInMonth = masterAccounts.filter(ma => {
+      const purchaseDate = ma.purchase_date || new Date().toISOString().split('T')[0];
+      return getMonthStartFromDate(purchaseDate) <= targetMonth;
+    });
     const uniqueManualAccounts = new Set<string>();
 
     let revenue = 0;
-    let cost = 0;
+    let cost = maInMonth.reduce((acc, ma) => acc + getMasterAccountMonthlyCost(ma), 0);
+    let soldCost = 0;
 
     subsInMonth.forEach(sub => {
       const pricingConfig = pricingMap.get(sub.platform);
       revenue += getSubscriptionRevenue(sub, pricingConfig);
 
       if (sub.master_account_id) {
-        cost += getStockSubscriptionCost(sub, masterAccountsMap.get(sub.master_account_id));
+        soldCost += getStockSubscriptionCost(sub, masterAccountsMap.get(sub.master_account_id));
         return;
       }
 
       const key = getManualAccountKey(sub);
       const isNewAccount = !uniqueManualAccounts.has(key);
       if (isNewAccount) uniqueManualAccounts.add(key);
-      cost += getManualSubscriptionCost(sub, pricingConfig, isNewAccount);
+      const manualCost = getManualSubscriptionCost(sub, pricingConfig, isNewAccount);
+      cost += manualCost;
+      soldCost += manualCost;
     });
 
-    const profit = revenue - cost;
+    const profit = revenue - soldCost;
 
     return {
       month,

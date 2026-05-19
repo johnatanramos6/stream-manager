@@ -37,7 +37,7 @@ const baseSub: Subscription = {
 };
 
 describe('finance calculations', () => {
-  it('recognizes real profit when selling a full stock account', () => {
+  it('recognizes real profit while keeping the master account purchase in monthly costs', () => {
     const fullAccountSale: Subscription = {
       ...baseSub,
       master_account_id: masterAccount.id,
@@ -49,6 +49,7 @@ describe('finance calculations', () => {
 
     expect(stats.totalRevenue).toBe(30000);
     expect(stats.totalCost).toBe(20000);
+    expect(stats.platformStats[0].soldCost).toBe(20000);
     expect(stats.totalProfit).toBe(10000);
     expect(stats.totalClients).toBe(4);
   });
@@ -64,17 +65,18 @@ describe('finance calculations', () => {
     const stats = calculateCurrentFinancialStats([oneProfileSale], [masterAccount], pricing);
 
     expect(stats.totalRevenue).toBe(10000);
-    expect(stats.totalCost).toBe(5000);
+    expect(stats.totalCost).toBe(20000);
+    expect(stats.platformStats[0].soldCost).toBe(5000);
     expect(stats.totalProfit).toBe(5000);
   });
 
-  it('does not count unsold inventory as sold cost', () => {
+  it('counts unsold master accounts as monthly costs without reducing real sales profit', () => {
     const stats = calculateCurrentFinancialStats([], [masterAccount], pricing);
 
     expect(stats.totalRevenue).toBe(0);
-    expect(stats.totalCost).toBe(0);
+    expect(stats.totalCost).toBe(20000);
     expect(stats.totalProfit).toBe(0);
-    expect(stats.platformStats[0]).toMatchObject({ platform: 'Netflix', accounts: 1, clients: 0 });
+    expect(stats.platformStats[0]).toMatchObject({ platform: 'Netflix', accounts: 1, clients: 0, cost: 20000, soldCost: 0 });
   });
 
   it('counts per-account manual cost only once for the same account', () => {
@@ -98,7 +100,7 @@ describe('finance calculations', () => {
     expect(stats.totalProfit).toBe(32000);
   });
 
-  it('uses the same stock cost logic in monthly snapshots', () => {
+  it('uses the same separated cost and profit logic in monthly snapshots', () => {
     const fullAccountSale: Subscription = {
       ...baseSub,
       master_account_id: masterAccount.id,
