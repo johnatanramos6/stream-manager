@@ -328,21 +328,23 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
                     <span className="text-xs font-semibold truncate">{a.platform}</span>
                     <span className="text-[10px] text-muted-foreground truncate hidden sm:inline">{a.account_email}</span>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[10px] text-red-400">Venció {getExpiryDate(a.purchase_date)}</span>
-                    <Button size="sm" variant="outline" className="h-6 text-[9px] text-green-600 border-green-600/30" onClick={() => {
-                      handleRenewAccount(a);
-                      if (a.supplier_phone) {
-                        const phone = a.supplier_phone.replace(/\D/g, '');
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-[10px] text-red-400 mr-1">Venció {getExpiryDate(a.purchase_date)}</span>
+                    {a.supplier_phone && (
+                      <Button size="sm" variant="outline" className="h-6 text-[9px] text-green-600 border-green-600/30" title="Enviar mensaje al proveedor" onClick={() => {
+                        const phone = a.supplier_phone!.replace(/\D/g, '');
                         const provName = a.supplier_name || 'Proveedor';
                         const purchaseD = new Date((a.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
                         const cutoff = new Date(purchaseD); cutoff.setDate(cutoff.getDate() + (a.duration_days || 30));
                         const fmtDate = (d: Date) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
-                        const msg = `Hola\u00A1 ${provName} le escribo por el siguiente servicio de ${a.platform}\n\n\uD83D\uDCE7 Correo: ${a.account_email}\n\uD83D\uDD11 Contrase\u00F1a: ${a.account_password}\n\uD83D\uDDD3\uFE0F Fecha de inicio: ${fmtDate(purchaseD)}\n\u2622\uFE0F Fecha de fin: ${fmtDate(cutoff)}\n\nSolicito renovacion del servicio.`;
+                        const msg = `Hola¡ ${provName} le escribo por el siguiente servicio de ${a.platform}\n\n📧 Correo: ${a.account_email}\n🔑 Contraseña: ${a.account_password}\n🗓️ Fecha de inicio: ${fmtDate(purchaseD)}\n☢️ Fecha de fin: ${fmtDate(cutoff)}\n\nSolicito renovacion del servicio.`;
                         window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`, '_blank');
-                      }
-                    }}>
-                      <RefreshCw className="h-3 w-3 mr-1" /> Renovar
+                      }}>
+                        <MessageCircle className="h-3 w-3 mr-1" /> Pedir
+                      </Button>
+                    )}
+                    <Button size="sm" variant="outline" className="h-6 text-[9px] text-emerald-600 border-emerald-600/30" onClick={() => handleRenewAccount(a)}>
+                      <RefreshCw className="h-3 w-3 mr-1" /> Renovar cuenta
                     </Button>
                   </div>
                 </div>
@@ -354,21 +356,23 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
                     <span className="text-xs font-semibold truncate">{a.platform}</span>
                     <span className="text-[10px] text-muted-foreground truncate hidden sm:inline">{a.account_email}</span>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[10px] text-amber-400">Vence {a.expiryDate}</span>
-                    <Button size="sm" variant="outline" className="h-6 text-[9px] text-green-600 border-green-600/30" onClick={() => {
-                      handleRenewAccount(a);
-                      if (a.supplier_phone) {
-                        const phone = a.supplier_phone.replace(/\D/g, '');
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-[10px] text-amber-400 mr-1">Vence {a.expiryDate}</span>
+                    {a.supplier_phone && (
+                      <Button size="sm" variant="outline" className="h-6 text-[9px] text-green-600 border-green-600/30" title="Enviar mensaje al proveedor" onClick={() => {
+                        const phone = a.supplier_phone!.replace(/\D/g, '');
                         const provName = a.supplier_name || 'Proveedor';
                         const purchaseD = new Date((a.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
                         const cutoff = new Date(purchaseD); cutoff.setDate(cutoff.getDate() + (a.duration_days || 30));
                         const fmtDate = (d: Date) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
-                        const msg = `Hola\u00A1 ${provName} le escribo por el siguiente servicio de ${a.platform}\n\n\uD83D\uDCE7 Correo: ${a.account_email}\n\uD83D\uDD11 Contrase\u00F1a: ${a.account_password}\n\uD83D\uDDD3\uFE0F Fecha de inicio: ${fmtDate(purchaseD)}\n\u2622\uFE0F Fecha de fin: ${fmtDate(cutoff)}\n\nSolicito renovacion del servicio.`;
+                        const msg = `Hola¡ ${provName} le escribo por el siguiente servicio de ${a.platform}\n\n📧 Correo: ${a.account_email}\n🔑 Contraseña: ${a.account_password}\n🗓️ Fecha de inicio: ${fmtDate(purchaseD)}\n☢️ Fecha de fin: ${fmtDate(cutoff)}\n\nSolicito renovacion del servicio.`;
                         window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`, '_blank');
-                      }
-                    }}>
-                      <RefreshCw className="h-3 w-3 mr-1" /> Renovar
+                      }}>
+                        <MessageCircle className="h-3 w-3 mr-1" /> Pedir
+                      </Button>
+                    )}
+                    <Button size="sm" variant="outline" className="h-6 text-[9px] text-emerald-600 border-emerald-600/30" onClick={() => handleRenewAccount(a)}>
+                      <RefreshCw className="h-3 w-3 mr-1" /> Renovar cuenta
                     </Button>
                   </div>
                 </div>
