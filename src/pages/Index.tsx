@@ -680,6 +680,33 @@ function IndexContent() {
     setFormOpen(true);
   };
 
+  const handleRenewSubscription = async (id: string) => {
+    const sub = subs.find(s => s.id === id);
+    if (!sub) return;
+    
+    // Calcular nueva fecha sumando la duración a la fecha de compra actual
+    const d = new Date(sub.purchaseDate + 'T12:00:00');
+    d.setDate(d.getDate() + (sub.duration_days || 30));
+    const newPurchaseDate = d.toISOString().split('T')[0];
+
+    const { error } = await supabase.from('subscriptions')
+      .update({ 
+        purchase_date: newPurchaseDate,
+        payment_status: 'pagado' // Opcional: marcar como pagado al renovar
+      })
+      .eq('id', id);
+
+    if (error) {
+      toast.error('Error al renovar la suscripción');
+      return;
+    }
+
+    setSubs(prev => prev.map(s => 
+      s.id === id ? { ...s, purchaseDate: newPurchaseDate, paymentStatus: 'pagado' } : s
+    ));
+    toast.success('¡Suscripción renovada exitosamente!');
+  };
+
   const handleDeleteRequest = (id: string) => {
     setDeleteId(id);
   };
@@ -869,6 +896,7 @@ function IndexContent() {
             <SubscriptionTable
               subscriptions={filtered}
               onEdit={handleEdit}
+              onRenew={handleRenewSubscription}
               onDelete={handleDeleteRequest}
               onTogglePayment={handleTogglePayment}
               onSendWelcome={setWelcomeSub}

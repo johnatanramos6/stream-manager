@@ -38,15 +38,13 @@ export function getPlatformClass(platform: Platform): string {
 
 export function getNextPaymentDate(purchaseDate: string, durationDays: number = 30): Date {
   const purchase = new Date(purchaseDate + 'T12:00:00');
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
   const next = new Date(purchase);
   next.setHours(0, 0, 0, 0);
   
-  // Sumamos los días exactos de duración para que coincida siempre con el cálculo de WhatsApp
-  while (next <= now) {
-    next.setDate(next.getDate() + durationDays);
-  }
+  // Sumamos los días exactos de duración.
+  // Ya no sumamos repetidamente con un bucle while para evitar la "auto-renovación".
+  // Si está vencida, debe quedarse vencida.
+  next.setDate(next.getDate() + durationDays);
   
   return next;
 }

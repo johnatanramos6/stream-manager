@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 interface Props {
   subscriptions: Subscription[];
   onEdit: (sub: Subscription) => void;
-  onDelete: (id: string) => void;
+  onRenew: (id: string) => void;
   onDelete: (id: string) => void;
   onTogglePayment: (id: string) => void;
   onSendWelcome: (sub: Subscription) => void;
@@ -18,7 +18,7 @@ interface Props {
 type SortKey = 'clientName' | 'platform' | 'purchaseDate' | 'paymentStatus' | null;
 type SortDir = 'asc' | 'desc';
 
-export default function SubscriptionTable({ subscriptions, onEdit, onDelete, onTogglePayment, onSendWelcome }: Props) {
+export default function SubscriptionTable({ subscriptions, onEdit, onRenew, onDelete, onTogglePayment, onSendWelcome }: Props) {
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>(null);
@@ -271,7 +271,10 @@ Quedo pendiente 👍`;
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                      <Button size="icon" variant="ghost" className="h-7 w-7 hover:bg-primary/10 hover:text-primary" onClick={() => onEdit(sub)}>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 hover:bg-emerald-500/10 text-emerald-600" onClick={() => onRenew(sub.id)} title="Renovar Ciclo (Añade días sin perder los actuales)">
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 hover:bg-primary/10 hover:text-primary" onClick={() => onEdit(sub)} title="Editar">
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                       <Button size="icon" variant="ghost" className="h-7 w-7 hover:bg-destructive/10 text-destructive" onClick={() => onDelete(sub.id)}>
@@ -347,6 +350,9 @@ Quedo pendiente 👍`;
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-emerald-500/10 text-emerald-600" onClick={() => onRenew(sub.id)} title="Renovar Ciclo">
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </Button>
                   <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-primary/10 hover:text-primary" onClick={() => onEdit(sub)}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
