@@ -23,6 +23,7 @@ import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useContacts } from '@/hooks/useContacts';
 import Login from '@/components/Login';
 import AdminPanel from '@/components/AdminPanel';
 
@@ -238,6 +239,9 @@ function IndexContent() {
   const [welcomeSub, setWelcomeSub] = useState<Subscription | null>(null);
   const [replacementSub, setReplacementSub] = useState<Subscription | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Hook de contactos persistentes (autocompletado)
+  const { clients: clientContacts, providers: providerContacts, upsertContact } = useContacts(user?.id);
 
   const dynamicPlatforms = Array.isArray(pricingConfig) 
     ? pricingConfig.map(p => p?.platform || '').filter(p => p.trim() !== '')
@@ -592,6 +596,11 @@ function IndexContent() {
     const { error } = await supabase.from('subscriptions').upsert(payload);
     if (error) return toast.error("Error al guardar en la nube");
 
+    // Guardar contacto del cliente automáticamente (persistente)
+    if (sub.clientName?.trim()) {
+      upsertContact(sub.clientName, sub.clientPhone || null, 'client');
+    }
+
     // Lógica para detectar cambio de contraseña
     let updatedSubs = [...subs];
     const isPasswordChanged = editing && editing.accountPassword !== sub.accountPassword && sub.accountPassword && sub.accountEmail;
@@ -871,6 +880,8 @@ function IndexContent() {
             subscriptions={subs}
             dynamicPlatforms={dynamicPlatforms}
             onAccountsChange={setMasterAccounts}
+            providerContacts={providerContacts}
+            onProviderSaved={(name, phone) => upsertContact(name, phone, 'provider')}
             onPasswordChanged={async (masterAccountId, newPassword, platform) => {
               // Buscar todos los clientes asociados a esta cuenta maestra
               const affectedSubs = subs.filter(s => s.master_account_id === masterAccountId);
@@ -930,6 +941,7 @@ function IndexContent() {
         dynamicPlatforms={dynamicPlatforms}
         allSubscriptions={subs}
         masterAccounts={masterAccounts}
+        clientContacts={clientContacts}
       />
 
       {/* ── Delete Confirmation ── */}

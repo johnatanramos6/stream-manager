@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { MasterAccount } from '@/types/masterAccount';
 import { Subscription } from '@/types/subscription';
+import { Contact } from '@/types/contact';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -20,9 +21,11 @@ interface Props {
   dynamicPlatforms: string[];
   onAccountsChange: (accounts: MasterAccount[]) => void;
   onPasswordChanged?: (masterAccountId: string, newPassword: string, platform: string) => void;
+  providerContacts?: Contact[];
+  onProviderSaved?: (name: string, phone: string | null) => void;
 }
 
-export default function AccountsSection({ accounts, subscriptions, dynamicPlatforms, onAccountsChange, onPasswordChanged }: Props) {
+export default function AccountsSection({ accounts, subscriptions, dynamicPlatforms, onAccountsChange, onPasswordChanged, providerContacts = [], onProviderSaved }: Props) {
   const { user } = useAuth();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<MasterAccount | null>(null);
@@ -33,6 +36,8 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showExpiryPanel, setShowExpiryPanel] = useState(false);
+  const [showProviderSuggestions, setShowProviderSuggestions] = useState(false);
+  const providerInputRef = useRef<HTMLInputElement>(null);
 
   // Form state
   const emptyForm = { platform: dynamicPlatforms[0] || 'Netflix', account_email: '', account_password: '', total_profiles: 4, purchase_price: 0, notes: '', purchase_date: new Date().toISOString().split('T')[0], supplier_phone: '', supplier_name: '', duration_days: 30 };
@@ -178,6 +183,11 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
       onAccountsChange(accounts.map(a => a.id === editing.id ? { ...a, ...form } : a));
       toast.success('Cuenta actualizada');
 
+      // Guardar proveedor en contactos persistentes
+      if (form.supplier_name?.trim() && onProviderSaved) {
+        onProviderSaved(form.supplier_name, form.supplier_phone || null);
+      }
+
       // Si la contraseña cambió, invocar callback para notificar clientes
       if (editing.account_password !== form.account_password && onPasswordChanged) {
         onPasswordChanged(editing.id, form.account_password, form.platform);
@@ -201,6 +211,11 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
       if (error) return toast.error('Error al crear: ' + error.message);
       if (data) onAccountsChange([data, ...accounts]);
       toast.success('Cuenta agregada al inventario');
+
+      // Guardar proveedor en contactos persistentes
+      if (form.supplier_name?.trim() && onProviderSaved) {
+        onProviderSaved(form.supplier_name, form.supplier_phone || null);
+      }
     }
     setFormOpen(false);
     setEditing(null);
@@ -566,9 +581,61 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
                 <User className="h-4 w-4" /> Datos del proveedor (opcional)
               </Label>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 relative">
                   <Label className="text-[10px] text-muted-foreground font-semibold">Nombre del proveedor</Label>
-                  <Input value={form.supplier_name} onChange={e => setForm(p => ({ ...p, supplier_name: e.target.value }))} placeholder="Ej: Carlos, Tienda X..." />
+                  <Input 
+                    ref={providerInputRef}
+                    value={form.supplier_name} 
+                    onChange={e => {
+                      setForm(p => ({ ...p, supplier_name: e.target.value }));
+                      setShowProviderSuggestions(true);
+                    }}
+                    onFocus={() => setShowProviderSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowProviderSuggestions(false), 200)}
+                    placeholder="Ej: Carlos, Tienda X..." 
+                    autoComplete="off"
+                  />
+                  {(() => {
+                    if (!showProviderSuggestions || !form.supplier_name || form.supplier_name.trim().length < 2) return null;
+                    const q = form.supplier_name.trim().toLowerCase();
+                    const suggestions = providerContacts
+                      .filter(c => c.name.toLowerCase().includes(q))
+                      .sort((a, b) => {
+                        const aStarts = a.name.toLowerCase().startsWith(q) ? 0 : 1;
+                        const bStarts = b.name.toLowerCase().startsWith(q) ? 0 : 1;
+                        return aStarts - bStarts || a.name.localeCompare(b.name);
+                      })
+                      .slice(0, 8);
+                    if (suggestions.length === 0) return null;
+                    return (
+                      <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-lg shadow-xl max-h-[200px] overflow-y-auto">
+                        {suggestions.map(contact => (
+                          <button
+                            key={contact.id}
+                            type="button"
+                            className="w-full text-left px-3 py-2 hover:bg-accent hover:text-accent-foreground transition-colors flex items-center justify-between gap-2 text-sm"
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={() => {
+                              setForm(p => ({
+                                ...p,
+                                supplier_name: contact.name,
+                                ...((!p.supplier_phone && contact.phone) ? { supplier_phone: contact.phone } : {})
+                              }));
+                              setShowProviderSuggestions(false);
+                            }}
+                          >
+                            <span className="font-medium truncate">{contact.name}</span>
+                            {contact.phone && (
+                              <span className="text-[10px] text-muted-foreground flex-shrink-0">📱 {contact.phone}</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                  {providerContacts.length > 0 && !form.supplier_name && (
+                    <p className="text-[10px] text-muted-foreground">💡 Escribe para buscar proveedores</p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-[10px] text-muted-foreground font-semibold">Teléfono / WhatsApp</Label>

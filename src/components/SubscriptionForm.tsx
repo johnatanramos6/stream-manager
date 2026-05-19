@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Subscription, Platform, PaymentStatus } from '@/types/subscription';
 import { MasterAccount } from '@/types/masterAccount';
+import { Contact } from '@/types/contact';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,9 +18,10 @@ interface Props {
   dynamicPlatforms?: string[];
   allSubscriptions?: Subscription[];
   masterAccounts?: MasterAccount[];
+  clientContacts?: Contact[];
 }
 
-export default function SubscriptionForm({ open, onClose, onSave, initial, dynamicPlatforms = [], allSubscriptions = [], masterAccounts = [] }: Props) {
+export default function SubscriptionForm({ open, onClose, onSave, initial, dynamicPlatforms = [], allSubscriptions = [], masterAccounts = [], clientContacts = [] }: Props) {
   const empty: Omit<Subscription, 'id'> = {
     platform: 'Netflix',
     accountEmail: '',
@@ -41,6 +43,8 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
   const [selectedMasterAccountId, setSelectedMasterAccountId] = useState<string>('');
   const [sellFullAccount, setSellFullAccount] = useState(false);
   const [durationInput, setDurationInput] = useState<string>('30');
+  const [showClientSuggestions, setShowClientSuggestions] = useState(false);
+  const clientInputRef = useRef<HTMLInputElement>(null);
 
   const existingAccounts = useMemo(() => {
     const map = new Map<string, { email: string; password: string; accountName: string }>();
@@ -93,6 +97,35 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
   useEffect(() => {
     setSelectedMasterAccountId('');
   }, [form.platform]);
+
+  // ── Autocompletado de clientes ──
+  const clientSuggestions = useMemo(() => {
+    if (!form.clientName || form.clientName.trim().length < 2) return [];
+    const q = form.clientName.trim().toLowerCase();
+    return clientContacts
+      .filter(c => c.name.toLowerCase().includes(q))
+      .sort((a, b) => {
+        const aStarts = a.name.toLowerCase().startsWith(q) ? 0 : 1;
+        const bStarts = b.name.toLowerCase().startsWith(q) ? 0 : 1;
+        return aStarts - bStarts || a.name.localeCompare(b.name);
+      })
+      .slice(0, 8);
+  }, [form.clientName, clientContacts]);
+
+  const handleClientNameChange = (name: string) => {
+    setForm(prev => ({ ...prev, clientName: name }));
+    setShowClientSuggestions(true);
+  };
+
+  const handleSelectClient = (contact: Contact) => {
+    setForm(prev => ({
+      ...prev,
+      clientName: contact.name,
+      // Solo auto-rellenar si el campo de teléfono está vacío
+      ...((!prev.clientPhone && contact.phone) ? { clientPhone: contact.phone } : {})
+    }));
+    setShowClientSuggestions(false);
+  };
 
   const handleEmailChange = (email: string) => {
     setForm(prev => {
@@ -216,9 +249,39 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 relative">
               <Label className="text-xs font-semibold">Cliente <span className="text-destructive">*</span></Label>
-              <Input value={form.clientName} onChange={e => set('clientName', e.target.value)} required placeholder="Nombre del cliente" />
+              <Input 
+                ref={clientInputRef}
+                value={form.clientName} 
+                onChange={e => handleClientNameChange(e.target.value)} 
+                onFocus={() => setShowClientSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowClientSuggestions(false), 200)}
+                required 
+                placeholder="Nombre del cliente" 
+                autoComplete="off"
+              />
+              {showClientSuggestions && clientSuggestions.length > 0 && (
+                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-lg shadow-xl max-h-[200px] overflow-y-auto">
+                  {clientSuggestions.map(contact => (
+                    <button
+                      key={contact.id}
+                      type="button"
+                      className="w-full text-left px-3 py-2 hover:bg-accent hover:text-accent-foreground transition-colors flex items-center justify-between gap-2 text-sm"
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => handleSelectClient(contact)}
+                    >
+                      <span className="font-medium truncate">{contact.name}</span>
+                      {contact.phone && (
+                        <span className="text-[10px] text-muted-foreground flex-shrink-0">📱 {contact.phone}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {clientContacts.length > 0 && !form.clientName && (
+                <p className="text-[10px] text-muted-foreground">💡 Escribe para buscar clientes registrados</p>
+              )}
             </div>
           </div>
 
