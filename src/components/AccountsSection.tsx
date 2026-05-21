@@ -106,8 +106,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
 
   const getExpiryStatus = (days: number) => {
     if (days <= 0) return { label: 'Vencida', color: 'text-red-500 bg-red-500/10 border-red-500/30', border: 'border-red-500/50', icon: 'expired' };
-    if (days <= 3) return { label: `${days}d`, color: 'text-red-400 bg-red-400/10 border-red-400/30', border: 'border-red-400/40', icon: 'danger' };
-    if (days <= 7) return { label: `${days}d`, color: 'text-amber-500 bg-amber-500/10 border-amber-500/30', border: 'border-amber-500/40', icon: 'warning' };
+    if (days <= 3) return { label: `${days}d`, color: 'text-amber-500 bg-amber-500/10 border-amber-500/30', border: 'border-amber-500/40', icon: 'warning' };
     return { label: `${days}d`, color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/30', border: '', icon: 'ok' };
   };
 
@@ -125,13 +124,13 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
   const filtered = enrichedAccounts.filter(a => {
     if (search && !a.account_email.toLowerCase().includes(search.toLowerCase()) && !a.platform.toLowerCase().includes(search.toLowerCase())) return false;
     if (filterPlatform !== 'all' && a.platform !== filterPlatform) return false;
-    if (filterExpiry === 'expiring' && a.daysToExpiry > 7) return false;
+    if (filterExpiry === 'expiring' && a.daysToExpiry > 3) return false;
     if (filterExpiry === 'expired' && a.daysToExpiry > 0) return false;
     return true;
   });
 
   // Expiry stats
-  const expiringAccounts = useMemo(() => enrichedAccounts.filter(a => a.daysToExpiry <= 7 && a.daysToExpiry > 0).sort((a, b) => a.daysToExpiry - b.daysToExpiry), [enrichedAccounts]);
+  const expiringAccounts = useMemo(() => enrichedAccounts.filter(a => a.daysToExpiry <= 3 && a.daysToExpiry > 0).sort((a, b) => a.daysToExpiry - b.daysToExpiry), [enrichedAccounts]);
   const expiredAccounts = useMemo(() => enrichedAccounts.filter(a => a.daysToExpiry <= 0).sort((a, b) => a.daysToExpiry - b.daysToExpiry), [enrichedAccounts]);
   const totalUrgent = expiringAccounts.length + expiredAccounts.length;
 
@@ -352,7 +351,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
               {expiringAccounts.map(a => (
                 <div key={a.id} className="flex items-center justify-between bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${a.daysToExpiry <= 3 ? 'text-red-400 bg-red-400/20' : 'text-amber-500 bg-amber-500/20'}`}>{a.daysToExpiry}d</span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 text-amber-500 bg-amber-500/20`}>{a.daysToExpiry}d</span>
                     <span className="text-xs font-semibold truncate">{a.platform}</span>
                     <span className="text-[10px] text-muted-foreground truncate hidden sm:inline">{a.account_email}</span>
                   </div>
@@ -421,7 +420,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold">{account.platform}</span>
-                    {account.daysToExpiry <= 7 && (
+                    {account.daysToExpiry <= 3 && (
                       <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border flex items-center gap-0.5 ${getExpiryStatus(account.daysToExpiry).color}`}>
                         <Clock className="h-2.5 w-2.5" />
                         {account.daysToExpiry <= 0 ? 'Vencida' : `${account.daysToExpiry}d`}
@@ -475,7 +474,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
                 </div>
                 <div className="flex justify-between items-center text-[10px] pb-1">
                   <span className="text-muted-foreground flex items-center gap-1"><CalendarDays className="h-3 w-3" /> Compra: <span className="text-foreground font-semibold">{account.purchase_date || 'N/A'}</span></span>
-                  <span className={`flex items-center gap-1 ${account.daysToExpiry <= 3 ? 'text-red-400' : account.daysToExpiry <= 7 ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                  <span className={`flex items-center gap-1 ${account.daysToExpiry <= 0 ? 'text-red-500' : account.daysToExpiry <= 3 ? 'text-amber-500' : 'text-muted-foreground'}`}>
                     <Timer className="h-3 w-3" /> Vence: <span className="font-semibold">{account.expiryDate}</span>
                   </span>
                 </div>
