@@ -71,7 +71,7 @@ Quedo pendiente 👍`;
     
     const purchaseD = new Date(sub.purchaseDate + 'T12:00:00');
     const cutoffDate = new Date(purchaseD);
-    cutoffDate.setDate(cutoffDate.getDate() + 30);
+    cutoffDate.setDate(cutoffDate.getDate() + (sub.duration_days || 30));
     const formatES = (d: Date) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
 
     const lines = [
@@ -98,7 +98,7 @@ Quedo pendiente 👍`;
     
     const purchaseD = new Date(sub.purchaseDate + 'T12:00:00');
     const cutoffDate = new Date(purchaseD);
-    cutoffDate.setDate(cutoffDate.getDate() + 30);
+    cutoffDate.setDate(cutoffDate.getDate() + (sub.duration_days || 30));
     const formatES = (d: Date) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
 
     const lines = [
