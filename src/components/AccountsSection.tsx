@@ -110,16 +110,9 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
 
   const handlePurchaseDateChange = (newPurchaseDate: string) => {
     if (!newPurchaseDate) return;
-    const oldCut = cutDate;
-    const newPurchase = new Date(newPurchaseDate + 'T12:00:00');
-    const cut = new Date(oldCut + 'T12:00:00');
-    const diffMs = cut.getTime() - newPurchase.getTime();
-    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
-    if (diffDays > 0) {
-      setForm(prev => ({ ...prev, purchase_date: newPurchaseDate, duration_days: diffDays }));
-    } else {
-      setForm(prev => ({ ...prev, purchase_date: newPurchaseDate, duration_days: 30 }));
-    }
+    // Solo actualizar la fecha de compra; la duración se mantiene fija
+    // y la fecha de corte se recalcula automáticamente via useMemo
+    setForm(prev => ({ ...prev, purchase_date: newPurchaseDate }));
   };
 
   const getAssignedCount = (accountId: string) => {
