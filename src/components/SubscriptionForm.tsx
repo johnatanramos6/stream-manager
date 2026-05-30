@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Subscription, Platform, PaymentStatus } from '@/types/subscription';
 import { MasterAccount } from '@/types/masterAccount';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -41,6 +41,53 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
   const [selectedMasterAccountId, setSelectedMasterAccountId] = useState<string>('');
   const [sellFullAccount, setSellFullAccount] = useState(false);
   const [durationInput, setDurationInput] = useState<string>('30');
+  const [showClientSuggestions, setShowClientSuggestions] = useState(false);
+  const clientInputRef = useRef<HTMLInputElement>(null);
+  const clientDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Build unique client contacts from all subscriptions
+  const clientContacts = useMemo(() => {
+    const map = new Map<string, { name: string; phone: string }>();
+    allSubscriptions.forEach(s => {
+      if (s.clientName) {
+        const key = s.clientName.toLowerCase().trim();
+        if (!map.has(key)) {
+          map.set(key, { name: s.clientName, phone: s.clientPhone || '' });
+        } else if (!map.get(key)!.phone && s.clientPhone) {
+          map.set(key, { name: s.clientName, phone: s.clientPhone });
+        }
+      }
+    });
+    return Array.from(map.values());
+  }, [allSubscriptions]);
+
+  // Filter suggestions based on current input
+  const clientSuggestions = useMemo(() => {
+    if (!form.clientName || form.clientName.length < 1) return [];
+    const query = form.clientName.toLowerCase().trim();
+    return clientContacts.filter(c => 
+      c.name.toLowerCase().includes(query) && c.name.toLowerCase() !== query
+    ).slice(0, 6);
+  }, [form.clientName, clientContacts]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        clientDropdownRef.current && !clientDropdownRef.current.contains(e.target as Node) &&
+        clientInputRef.current && !clientInputRef.current.contains(e.target as Node)
+      ) {
+        setShowClientSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelectClient = (client: { name: string; phone: string }) => {
+    setForm(prev => ({ ...prev, clientName: client.name, clientPhone: client.phone }));
+    setShowClientSuggestions(false);
+  };
 
   const existingAccounts = useMemo(() => {
     const map = new Map<string, { email: string; password: string; accountName: string }>();
@@ -216,9 +263,35 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 relative">
               <Label className="text-xs font-semibold">Cliente <span className="text-destructive">*</span></Label>
-              <Input value={form.clientName} onChange={e => set('clientName', e.target.value)} required placeholder="Nombre del cliente" />
+              <Input
+                ref={clientInputRef}
+                value={form.clientName}
+                onChange={e => { set('clientName', e.target.value); setShowClientSuggestions(true); }}
+                onFocus={() => setShowClientSuggestions(true)}
+                required
+                placeholder="Nombre del cliente"
+                autoComplete="off"
+              />
+              {showClientSuggestions && clientSuggestions.length > 0 && (
+                <div
+                  ref={clientDropdownRef}
+                  className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-lg shadow-xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-100"
+                >
+                  {clientSuggestions.map((c, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-accent transition-colors"
+                      onClick={() => handleSelectClient(c)}
+                    >
+                      <span className="font-medium truncate">{c.name}</span>
+                      {c.phone && <span className="text-muted-foreground text-[10px] shrink-0">📱 {c.phone}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

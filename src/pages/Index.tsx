@@ -143,7 +143,7 @@ function IndexContent() {
   const [showAdmin, setShowAdmin] = useState(false);
   const [pricingConfig, setPricingConfig] = useState(DEFAULT_PRICING);
   const [masterAccounts, setMasterAccounts] = useState<MasterAccount[]>([]);
-  const [notifyState, setNotifyState] = useState<{ open: boolean, clients: Subscription[], newPassword: string, platform: string }>({ open: false, clients: [], newPassword: '', platform: '' });
+  const [notifyState, setNotifyState] = useState<{ open: boolean, clients: Subscription[], newEmail?: string, newPassword?: string, platform: string, emailChanged?: boolean, passwordChanged?: boolean }>({ open: false, clients: [], platform: '' });
   const [welcomeSub, setWelcomeSub] = useState<Subscription | null>(null);
   const [replacementSub, setReplacementSub] = useState<Subscription | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -501,35 +501,46 @@ function IndexContent() {
     const { error } = await supabase.from('subscriptions').upsert(payload);
     if (error) return toast.error("Error al guardar en la nube");
 
-    // Lógica para detectar cambio de contraseña
+    // Lógica para detectar cambio de credenciales
     let updatedSubs = [...subs];
-    const isPasswordChanged = editing && editing.accountPassword !== sub.accountPassword && sub.accountPassword && sub.accountEmail;
+    const isEmailChanged = !!(editing && editing.accountEmail !== sub.accountEmail && sub.accountEmail);
+    const isPasswordChanged = !!(editing && editing.accountPassword !== sub.accountPassword && sub.accountPassword && sub.accountEmail);
     
-    if (isPasswordChanged) {
-      // Find affected subscriptions (same platform and email, or same master account)
+    if (isEmailChanged || isPasswordChanged) {
+      // Find affected subscriptions (same platform and old email, or same master account)
       const affectedSubs = subs.filter(s => 
-        (s.platform === sub.platform && s.accountEmail.toLowerCase() === sub.accountEmail.toLowerCase()) ||
+        (s.platform === sub.platform && s.accountEmail.toLowerCase() === editing!.accountEmail.toLowerCase()) ||
         (sub.master_account_id && s.master_account_id === sub.master_account_id)
       );
 
       if (affectedSubs.length > 0) {
+        const updatePayload: any = {};
+        if (isEmailChanged) updatePayload.account_email = sub.accountEmail;
+        if (isPasswordChanged) updatePayload.account_password = sub.accountPassword;
+
         // Prepare to update them all
         for (const affected of affectedSubs) {
            if (affected.id !== sub.id) {
-             await supabase.from('subscriptions').update({ account_password: sub.accountPassword }).eq('id', affected.id);
+             await supabase.from('subscriptions').update(updatePayload).eq('id', affected.id);
            }
         }
         
-        // Si pertenece a una cuenta maestra, también actualizamos la contraseña en la tabla master_accounts
+        // Si pertenece a una cuenta maestra, también actualizamos las credenciales en la tabla master_accounts
         if (sub.master_account_id) {
-          await supabase.from('master_accounts').update({ account_password: sub.accountPassword }).eq('id', sub.master_account_id);
-          setMasterAccounts(prev => prev.map(ma => ma.id === sub.master_account_id ? { ...ma, account_password: sub.accountPassword! } : ma));
+          await supabase.from('master_accounts').update(updatePayload).eq('id', sub.master_account_id);
+          setMasterAccounts(prev => prev.map(ma => ma.id === sub.master_account_id ? { ...ma, ...updatePayload } : ma));
         }
 
         // Update local state
-        updatedSubs = updatedSubs.map(s => 
-          affectedSubs.some(a => a.id === s.id) ? { ...s, accountPassword: sub.accountPassword! } : s
-        );
+        updatedSubs = updatedSubs.map(s => {
+          if (affectedSubs.some(a => a.id === s.id)) {
+            const up = { ...s };
+            if (isEmailChanged) up.accountEmail = sub.accountEmail;
+            if (isPasswordChanged) up.accountPassword = sub.accountPassword!;
+            return up;
+          }
+          return s;
+        });
 
         // Include the current sub in the notification list if it's new/edited and has phone
         const allAffectedToNotify = updatedSubs.filter(s => affectedSubs.some(a => a.id === s.id) || s.id === sub.id);
@@ -540,8 +551,11 @@ function IndexContent() {
         setNotifyState({
           open: true,
           clients: uniqueToNotify,
-          newPassword: sub.accountPassword,
-          platform: sub.platform
+          newEmail: isEmailChanged ? sub.accountEmail : undefined,
+          newPassword: isPasswordChanged ? sub.accountPassword : undefined,
+          platform: sub.platform,
+          emailChanged: isEmailChanged,
+          passwordChanged: isPasswordChanged
         });
       }
     }
@@ -578,6 +592,33 @@ function IndexContent() {
   const handleEdit = (sub: Subscription) => {
     setEditing(sub);
     setFormOpen(true);
+  };
+
+  const handleRenewSubscription = async (id: string) => {
+    const sub = subs.find(s => s.id === id);
+    if (!sub) return;
+    
+    // Calcular nueva fecha sumando la duración a la fecha de compra actual
+    const d = new Date(sub.purchaseDate + 'T12:00:00');
+    d.setDate(d.getDate() + (sub.duration_days || 30));
+    const newPurchaseDate = d.toISOString().split('T')[0];
+
+    const { error } = await supabase.from('subscriptions')
+      .update({ 
+        purchase_date: newPurchaseDate,
+        payment_status: 'pagado' // Opcional: marcar como pagado al renovar
+      })
+      .eq('id', id);
+
+    if (error) {
+      toast.error('Error al renovar la suscripción');
+      return;
+    }
+
+    setSubs(prev => prev.map(s => 
+      s.id === id ? { ...s, purchaseDate: newPurchaseDate, paymentStatus: 'pagado' } : s
+    ));
+    toast.success('¡Suscripción renovada exitosamente!');
   };
 
   const handleDeleteRequest = (id: string) => {
@@ -769,6 +810,7 @@ function IndexContent() {
             <SubscriptionTable
               subscriptions={filtered}
               onEdit={handleEdit}
+              onRenew={handleRenewSubscription}
               onDelete={handleDeleteRequest}
               onTogglePayment={handleTogglePayment}
               onSendWelcome={setWelcomeSub}
@@ -780,20 +822,30 @@ function IndexContent() {
             subscriptions={subs}
             dynamicPlatforms={dynamicPlatforms}
             onAccountsChange={setMasterAccounts}
-            onPasswordChanged={async (masterAccountId, newPassword, platform) => {
+            onCredentialsChanged={async (masterAccountId, newEmail, newPassword, platform, emailChanged, passwordChanged) => {
               // Buscar todos los clientes asociados a esta cuenta maestra
               const affectedSubs = subs.filter(s => s.master_account_id === masterAccountId);
               
               if (affectedSubs.length > 0) {
                 // Actualizar DB para todas las suscripciones
+                const updatePayload: any = {};
+                if (emailChanged) updatePayload.account_email = newEmail;
+                if (passwordChanged) updatePayload.account_password = newPassword;
+
                 for (const affected of affectedSubs) {
-                  await supabase.from('subscriptions').update({ account_password: newPassword }).eq('id', affected.id);
+                  await supabase.from('subscriptions').update(updatePayload).eq('id', affected.id);
                 }
                 
                 // Actualizar estado local
-                setSubs(prev => prev.map(s => 
-                  s.master_account_id === masterAccountId ? { ...s, accountPassword: newPassword } : s
-                ));
+                setSubs(prev => prev.map(s => {
+                  if (s.master_account_id === masterAccountId) {
+                    const up = { ...s };
+                    if (emailChanged) up.accountEmail = newEmail;
+                    if (passwordChanged) up.accountPassword = newPassword;
+                    return up;
+                  }
+                  return s;
+                }));
                 
                 // Remover duplicados
                 const uniqueToNotify = Array.from(new Map(affectedSubs.map(item => [item.id, item])).values());
@@ -801,8 +853,11 @@ function IndexContent() {
                 setNotifyState({
                   open: true,
                   clients: uniqueToNotify,
-                  newPassword,
-                  platform
+                  newEmail: emailChanged ? newEmail : undefined,
+                  newPassword: passwordChanged ? newPassword : undefined,
+                  platform,
+                  emailChanged,
+                  passwordChanged
                 });
               }
             }}
@@ -863,8 +918,11 @@ function IndexContent() {
         open={notifyState.open}
         onClose={() => setNotifyState(prev => ({ ...prev, open: false }))}
         clients={notifyState.clients}
+        newEmail={notifyState.newEmail}
         newPassword={notifyState.newPassword}
         platform={notifyState.platform}
+        emailChanged={notifyState.emailChanged}
+        passwordChanged={notifyState.passwordChanged}
       />
 
       <WelcomeWhatsAppDialog

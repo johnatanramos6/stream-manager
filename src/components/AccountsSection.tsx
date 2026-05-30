@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { MasterAccount } from '@/types/masterAccount';
 import { Subscription } from '@/types/subscription';
 import { supabase } from '@/lib/supabase';
@@ -19,10 +19,10 @@ interface Props {
   subscriptions: Subscription[];
   dynamicPlatforms: string[];
   onAccountsChange: (accounts: MasterAccount[]) => void;
-  onPasswordChanged?: (masterAccountId: string, newPassword: string, platform: string) => void;
+  onCredentialsChanged?: (masterAccountId: string, newEmail: string, newPassword: string, platform: string, emailChanged: boolean, passwordChanged: boolean) => void;
 }
 
-export default function AccountsSection({ accounts, subscriptions, dynamicPlatforms, onAccountsChange, onPasswordChanged }: Props) {
+export default function AccountsSection({ accounts, subscriptions, dynamicPlatforms, onAccountsChange, onCredentialsChanged }: Props) {
   const { user } = useAuth();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<MasterAccount | null>(null);
@@ -37,6 +37,53 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
   // Form state
   const emptyForm = { platform: dynamicPlatforms[0] || 'Netflix', account_email: '', account_password: '', total_profiles: 4, purchase_price: 0, notes: '', purchase_date: new Date().toISOString().split('T')[0], supplier_phone: '', supplier_name: '', duration_days: 30 };
   const [form, setForm] = useState(emptyForm);
+  const [showSupplierSuggestions, setShowSupplierSuggestions] = useState(false);
+  const supplierInputRef = useRef<HTMLInputElement>(null);
+  const supplierDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Build unique supplier contacts from all master accounts
+  const supplierContacts = useMemo(() => {
+    const map = new Map<string, { name: string; phone: string }>();
+    accounts.forEach(a => {
+      if (a.supplier_name) {
+        const key = a.supplier_name.toLowerCase().trim();
+        if (!map.has(key)) {
+          map.set(key, { name: a.supplier_name, phone: a.supplier_phone || '' });
+        } else if (!map.get(key)!.phone && a.supplier_phone) {
+          map.set(key, { name: a.supplier_name, phone: a.supplier_phone });
+        }
+      }
+    });
+    return Array.from(map.values());
+  }, [accounts]);
+
+  // Filter supplier suggestions based on current input
+  const supplierSuggestions = useMemo(() => {
+    if (!form.supplier_name || form.supplier_name.length < 1) return [];
+    const query = form.supplier_name.toLowerCase().trim();
+    return supplierContacts.filter(c =>
+      c.name.toLowerCase().includes(query) && c.name.toLowerCase() !== query
+    ).slice(0, 6);
+  }, [form.supplier_name, supplierContacts]);
+
+  // Close supplier dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        supplierDropdownRef.current && !supplierDropdownRef.current.contains(e.target as Node) &&
+        supplierInputRef.current && !supplierInputRef.current.contains(e.target as Node)
+      ) {
+        setShowSupplierSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelectSupplier = (supplier: { name: string; phone: string }) => {
+    setForm(prev => ({ ...prev, supplier_name: supplier.name, supplier_phone: supplier.phone }));
+    setShowSupplierSuggestions(false);
+  };
 
   const computeCutDate = (purchaseDate: string, durationDays: number): string => {
     if (!purchaseDate) return new Date().toISOString().split('T')[0];
@@ -178,9 +225,12 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
       onAccountsChange(accounts.map(a => a.id === editing.id ? { ...a, ...form } : a));
       toast.success('Cuenta actualizada');
 
-      // Si la contraseña cambió, invocar callback para notificar clientes
-      if (editing.account_password !== form.account_password && onPasswordChanged) {
-        onPasswordChanged(editing.id, form.account_password, form.platform);
+      // Si correo o contraseña cambiaron, invocar callback para notificar clientes
+      const emailChanged = editing.account_email !== form.account_email;
+      const passwordChanged = editing.account_password !== form.account_password;
+      
+      if ((emailChanged || passwordChanged) && onCredentialsChanged) {
+        onCredentialsChanged(editing.id, form.account_email, form.account_password, form.platform, emailChanged, passwordChanged);
       }
     } else {
       // Insert
@@ -566,9 +616,34 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
                 <User className="h-4 w-4" /> Datos del proveedor (opcional)
               </Label>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 relative">
                   <Label className="text-[10px] text-muted-foreground font-semibold">Nombre del proveedor</Label>
-                  <Input value={form.supplier_name} onChange={e => setForm(p => ({ ...p, supplier_name: e.target.value }))} placeholder="Ej: Carlos, Tienda X..." />
+                  <Input
+                    ref={supplierInputRef}
+                    value={form.supplier_name}
+                    onChange={e => { setForm(p => ({ ...p, supplier_name: e.target.value })); setShowSupplierSuggestions(true); }}
+                    onFocus={() => setShowSupplierSuggestions(true)}
+                    placeholder="Ej: Carlos, Tienda X..."
+                    autoComplete="off"
+                  />
+                  {showSupplierSuggestions && supplierSuggestions.length > 0 && (
+                    <div
+                      ref={supplierDropdownRef}
+                      className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-lg shadow-xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-100"
+                    >
+                      {supplierSuggestions.map((s, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-accent transition-colors"
+                          onClick={() => handleSelectSupplier(s)}
+                        >
+                          <span className="font-medium truncate">{s.name}</span>
+                          {s.phone && <span className="text-muted-foreground text-[10px] shrink-0">📱 {s.phone}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-[10px] text-muted-foreground font-semibold">Teléfono / WhatsApp</Label>
