@@ -43,7 +43,9 @@ export function getNextPaymentDate(purchaseDate: string, durationDays: number = 
   const next = new Date(purchase);
   next.setHours(0, 0, 0, 0);
   
-  // Sumamos los días exactos de duración para que coincida siempre con el cálculo de WhatsApp
+  // Siempre avanzar al menos una vez para obtener la primera fecha de corte real
+  // (purchaseDate + durationDays), luego seguir avanzando si ya pasó
+  next.setDate(next.getDate() + durationDays);
   while (next <= now) {
     next.setDate(next.getDate() + durationDays);
   }
