@@ -120,7 +120,6 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
       .reduce((sum, s) => sum + ((s as any).profiles_sold || 1), 0);
   };
 
-  // Helper: calcular días para vencimiento (purchase_date + duration_days)
   const getDaysToExpiry = (purchaseDate?: string, durationDays: number = 30): number => {
     if (!purchaseDate) return 999;
     const d = new Date(purchaseDate + 'T12:00:00');
@@ -129,7 +128,12 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     expiry.setHours(0, 0, 0, 0);
-    return Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    
+    const purchase = new Date(purchaseDate + 'T12:00:00');
+    purchase.setHours(0, 0, 0, 0);
+    const referenceDate = purchase > now ? purchase : now;
+    
+    return Math.ceil((expiry.getTime() - referenceDate.getTime()) / (1000 * 60 * 60 * 24));
   };
 
   const getExpiryDate = (purchaseDate?: string, durationDays: number = 30): string => {

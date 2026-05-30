@@ -58,7 +58,12 @@ export function getDaysUntilPayment(purchaseDate: string, durationDays: number =
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   next.setHours(0, 0, 0, 0);
-  return Math.ceil((next.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  
+  const purchase = new Date(purchaseDate + 'T12:00:00');
+  purchase.setHours(0, 0, 0, 0);
+  const referenceDate = purchase > now ? purchase : now;
+  
+  return Math.ceil((next.getTime() - referenceDate.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 export function getRowStatus(purchaseDate: string, durationDays: number = 30): 'normal' | 'warning' | 'danger' {
