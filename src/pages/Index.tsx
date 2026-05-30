@@ -155,8 +155,8 @@ function IndexContent() {
   useEffect(() => {
     if (!user) return;
     const fetchDb = async () => {
-      // Cargar suscripciones
-      const { data, error } = await supabase.from('subscriptions').select().eq('vendor_id', user.id);
+      // Cargar suscripciones (más recientes primero)
+      const { data, error } = await supabase.from('subscriptions').select().eq('vendor_id', user.id).order('created_at', { ascending: false });
       if (data) {
         setSubs(data.map(d => ({
           id: d.id,
@@ -565,7 +565,7 @@ function IndexContent() {
     setSubs(prev => {
       const exists = prev.find(s => s.id === sub.id);
       if (exists) return updatedSubs.map(s => s.id === sub.id ? sub : s);
-      return [...updatedSubs, sub];
+      return [sub, ...updatedSubs];
     });
     
     toast.success(isNew ? 'Suscripción agregada' : 'Suscripción actualizada');
