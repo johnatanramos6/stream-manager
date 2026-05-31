@@ -38,18 +38,9 @@ export function getPlatformClass(platform: Platform): string {
 
 export function getNextPaymentDate(purchaseDate: string, durationDays: number = 30): Date {
   const purchase = new Date(purchaseDate + 'T12:00:00');
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
   const next = new Date(purchase);
   next.setHours(0, 0, 0, 0);
-  
-  // Siempre avanzar al menos una vez para obtener la primera fecha de corte real
-  // (purchaseDate + durationDays), luego seguir avanzando si ya pasó
   next.setDate(next.getDate() + durationDays);
-  while (next <= now) {
-    next.setDate(next.getDate() + durationDays);
-  }
-  
   return next;
 }
 
