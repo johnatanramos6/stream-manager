@@ -115,6 +115,28 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
     setForm(prev => ({ ...prev, purchase_date: newPurchaseDate }));
   };
 
+  const handleRenewAccount = async (account: MasterAccount) => {
+    if (!user) return;
+    
+    const days = account.duration_days || 30;
+    const currentPurchaseDate = account.purchase_date || new Date().toISOString().split('T')[0];
+    const d = new Date(currentPurchaseDate + 'T12:00:00');
+    d.setDate(d.getDate() + days);
+    const newPurchaseDate = d.toISOString().split('T')[0];
+
+    const { error } = await supabase.from('master_accounts').update({
+      purchase_date: newPurchaseDate
+    }).eq('id', account.id);
+
+    if (error) {
+      toast.error('Error al renovar la cuenta: ' + error.message);
+      return;
+    }
+
+    onAccountsChange(accounts.map(a => a.id === account.id ? { ...a, purchase_date: newPurchaseDate } : a));
+    toast.success('¡Cuenta maestra renovada exitosamente!');
+  };
+
   const getAssignedCount = (accountId: string) => {
     return subscriptions.filter(s => (s as any).master_account_id === accountId)
       .reduce((sum, s) => sum + ((s as any).profiles_sold || 1), 0);
@@ -351,7 +373,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
                         const msg = `Hola\u00A1 ${provName} le escribo por el siguiente servicio de ${a.platform}\n\n\uD83D\uDCE7 Correo: ${a.account_email}\n\uD83D\uDD11 Contrase\u00F1a: ${a.account_password}\n\uD83D\uDDD3\uFE0F Fecha de inicio: ${fmtDate(purchaseD)}\n\u2622\uFE0F Fecha de fin: ${fmtDate(cutoff)}\n\nSolicito renovacion del servicio.`;
                         window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`, '_blank');
                       }}>
-                        <RefreshCw className="h-3 w-3 mr-1" /> Renovar
+                        <MessageCircle className="h-3 w-3 mr-1" /> Pedir Renovar
                       </Button>
                     )}
                   </div>
@@ -376,7 +398,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
                         const msg = `Hola\u00A1 ${provName} le escribo por el siguiente servicio de ${a.platform}\n\n\uD83D\uDCE7 Correo: ${a.account_email}\n\uD83D\uDD11 Contrase\u00F1a: ${a.account_password}\n\uD83D\uDDD3\uFE0F Fecha de inicio: ${fmtDate(purchaseD)}\n\u2622\uFE0F Fecha de fin: ${fmtDate(cutoff)}\n\nSolicito renovacion del servicio.`;
                         window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`, '_blank');
                       }}>
-                        <RefreshCw className="h-3 w-3 mr-1" /> Renovar
+                        <MessageCircle className="h-3 w-3 mr-1" /> Pedir Renovar
                       </Button>
                     )}
                   </div>
@@ -501,28 +523,33 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
 
                 {/* WhatsApp supplier actions */}
                 {account.supplier_phone && (
-                  <div className="flex gap-1.5 pt-1">
-                    <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] text-green-600 hover:bg-green-600/10 border-green-600/30" onClick={() => {
-                      const phone = account.supplier_phone!.replace(/\D/g, '');
-                      const provName = account.supplier_name || 'Proveedor';
-                      const purchaseD = new Date((account.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
-                      const cutoff = new Date(purchaseD); cutoff.setDate(cutoff.getDate() + 30);
-                      const fmtDate = (d: Date) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
-                      const msg = `Hola\u00A1 ${provName} le escribo por el siguiente servicio de ${account.platform}\n\n\uD83D\uDCE7 Correo: ${account.account_email}\n\uD83D\uDD11 Contrase\u00F1a: ${account.account_password}\n\uD83D\uDDD3\uFE0F Fecha de inicio: ${fmtDate(purchaseD)}\n\u2622\uFE0F Fecha de fin: ${fmtDate(cutoff)}\n\nSolicito renovacion del servicio.`;
-                      window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`, '_blank');
-                    }}>
-                      <RefreshCw className="h-3 w-3 mr-1" /> Renovar
-                    </Button>
-                    <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] text-amber-600 hover:bg-amber-600/10 border-amber-600/30" onClick={() => {
-                      const phone = account.supplier_phone!.replace(/\D/g, '');
-                      const provName = account.supplier_name || 'Proveedor';
-                      const purchaseD = new Date((account.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
-                      const cutoff = new Date(purchaseD); cutoff.setDate(cutoff.getDate() + (account.duration_days || 30));
-                      const fmtDate = (d: Date) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
-                      const msg = `Hola\u00A1 ${provName} le escribo por el siguiente servicio de ${account.platform}\n\n\uD83D\uDCE7 Correo: ${account.account_email}\n\uD83D\uDD11 Contrase\u00F1a: ${account.account_password}\n\uD83D\uDDD3\uFE0F Fecha de inicio: ${fmtDate(purchaseD)}\n\u2622\uFE0F Fecha de fin: ${fmtDate(cutoff)}\n\nSolicito soporte ante un inconveniente con el servicio.`;
-                      window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`, '_blank');
-                    }}>
-                      <Wrench className="h-3 w-3 mr-1" /> Soporte
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex gap-1.5">
+                      <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] text-green-600 hover:bg-green-600/10 border-green-600/30" onClick={() => {
+                        const phone = account.supplier_phone!.replace(/\D/g, '');
+                        const provName = account.supplier_name || 'Proveedor';
+                        const purchaseD = new Date((account.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
+                        const cutoff = new Date(purchaseD); cutoff.setDate(cutoff.getDate() + 30);
+                        const fmtDate = (d: Date) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
+                        const msg = `Hola\u00A1 ${provName} le escribo por el siguiente servicio de ${account.platform}\n\n\uD83D\uDCE7 Correo: ${account.account_email}\n\uD83D\uDD11 Contrase\u00F1a: ${account.account_password}\n\uD83D\uDDD3\uFE0F Fecha de inicio: ${fmtDate(purchaseD)}\n\u2622\uFE0F Fecha de fin: ${fmtDate(cutoff)}\n\nSolicito renovacion del servicio.`;
+                        window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`, '_blank');
+                      }}>
+                        <MessageCircle className="h-3 w-3 mr-1" /> Pedir Renovar
+                      </Button>
+                      <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] text-amber-600 hover:bg-amber-600/10 border-amber-600/30" onClick={() => {
+                        const phone = account.supplier_phone!.replace(/\D/g, '');
+                        const provName = account.supplier_name || 'Proveedor';
+                        const purchaseD = new Date((account.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
+                        const cutoff = new Date(purchaseD); cutoff.setDate(cutoff.getDate() + (account.duration_days || 30));
+                        const fmtDate = (d: Date) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
+                        const msg = `Hola\u00A1 ${provName} le escribo por el siguiente servicio de ${account.platform}\n\n\uD83D\uDCE7 Correo: ${account.account_email}\n\uD83D\uDD11 Contrase\u00F1a: ${account.account_password}\n\uD83D\uDDD3\uFE0F Fecha de inicio: ${fmtDate(purchaseD)}\n\u2622\uFE0F Fecha de fin: ${fmtDate(cutoff)}\n\nSolicito soporte ante un inconveniente con el servicio.`;
+                        window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`, '_blank');
+                      }}>
+                        <Wrench className="h-3 w-3 mr-1" /> Soporte
+                      </Button>
+                    </div>
+                    <Button size="sm" variant="outline" className="w-full h-7 text-[10px] text-emerald-600 hover:bg-emerald-600/10 border-emerald-600/30 flex items-center justify-center gap-1" onClick={() => handleRenewAccount(account)}>
+                      <RefreshCw className="h-3 w-3" /> Renovar en Sistema (Añadir {account.duration_days || 30} días)
                     </Button>
                   </div>
                 )}
