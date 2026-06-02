@@ -46,31 +46,31 @@ export function getPlatformLogoDetails(platform: string): { logoUrl?: string; bg
   const name = platform.toLowerCase().trim();
   
   if (name.includes('netflix')) {
-    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Netflix-new-icon.png', bgClass: 'bg-black', emoji: '🎬' };
+    return { logoUrl: 'https://cdn.simpleicons.org/netflix/E50914', bgClass: 'bg-black p-1.5', emoji: '🎬' };
   }
   if (name.includes('amazon') || name.includes('prime')) {
-    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/d/e4/Prime_Video_Logo.svg', bgClass: 'bg-white p-1', emoji: '📦' };
+    return { logoUrl: 'https://cdn.simpleicons.org/primevideo/00A8E1', bgClass: 'bg-zinc-950 p-1', emoji: '📦' };
   }
   if (name.includes('claro')) {
-    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/a/ae/Claro_logo.svg', bgClass: 'bg-white p-1.5', emoji: '🔴' };
+    return { logoUrl: 'https://cdn.simpleicons.org/claro/EF3829', bgClass: 'bg-white p-1.5', emoji: '🔴' };
   }
   if (name.includes('paramount')) {
-    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/a/a5/Paramount%2B_logo.svg', bgClass: 'bg-[#0064FF] p-0.5', emoji: '🏔️' };
+    return { logoUrl: 'https://cdn.simpleicons.org/paramount/ffffff', bgClass: 'bg-[#0064FF] p-0.5', emoji: '🏔️' };
   }
   if (name.includes('max') || name.includes('hbo')) {
-    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/1/1a/Max_logo.svg', bgClass: 'bg-[#002BE7] p-1.5', emoji: '🟣' };
+    return { logoUrl: 'https://cdn.simpleicons.org/hbo/ffffff', bgClass: 'bg-[#002BE7] p-1.5', emoji: '🟣' };
   }
   if (name.includes('disney') || name.includes('star')) {
-    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/3/3e/Disney%2B_logo.svg', bgClass: 'bg-[#0b133a] p-1.5', emoji: '🏰' };
+    return { logoUrl: 'https://cdn.simpleicons.org/disneyplus/ffffff', bgClass: 'bg-[#0b133a] p-1', emoji: '🏰' };
   }
   if (name.includes('crunchyroll') || name.includes('crunchy')) {
-    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/0/0e/Crunchyroll_logo.svg', bgClass: 'bg-white p-1', emoji: '🦊' };
+    return { logoUrl: 'https://cdn.simpleicons.org/crunchyroll/F47521', bgClass: 'bg-zinc-950 p-1', emoji: '🦊' };
   }
   if (name.includes('spotify')) {
-    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/1/19/Spotify_logo_without_text.svg', bgClass: 'bg-black p-1', emoji: '🎵' };
+    return { logoUrl: 'https://cdn.simpleicons.org/spotify/1DB954', bgClass: 'bg-black p-1', emoji: '🎵' };
   }
   if (name.includes('plex')) {
-    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/6/62/Plex_logo_%282022%29.svg', bgClass: 'bg-[#1f2326] p-1', emoji: '🟡' };
+    return { logoUrl: 'https://cdn.simpleicons.org/plex/E5A93B', bgClass: 'bg-[#1f2326] p-1', emoji: '🟡' };
   }
   if (name.includes('flujo')) {
     return { logoUrl: './flujo-logo.jpg', bgClass: 'bg-white p-1', emoji: '📺' };
@@ -79,37 +79,39 @@ export function getPlatformLogoDetails(platform: string): { logoUrl?: string; bg
     return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/e/e0/ViX_logo.svg', bgClass: 'bg-white p-1', emoji: '🧡' };
   }
   if (name.includes('canva')) {
-    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/0/08/Canva_icon_2021.svg', bgClass: 'bg-white p-1', emoji: '🎨' };
+    return { logoUrl: 'https://cdn.simpleicons.org/canva/00C4CC', bgClass: 'bg-white p-1', emoji: '🎨' };
   }
   if (name.includes('capcut')) {
-    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/f/f5/CapCut_logo.svg', bgClass: 'bg-white p-1.5', emoji: '🎬' };
+    return { logoUrl: 'https://cdn.simpleicons.org/capcut/ffffff', bgClass: 'bg-black p-1.5', emoji: '🎬' };
   }
   if (name.includes('microsoft') || name.includes('office') || name.includes('365') || name.includes('m365')) {
-    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/5/5f/Microsoft_Office_logo_%282019%E2%80%93present%29.svg', bgClass: 'bg-white p-1', emoji: '💼' };
+    return { logoUrl: 'https://cdn.simpleicons.org/microsoftoffice/D83B01', bgClass: 'bg-white p-1', emoji: '💼' };
   }
   if (name.includes('chatgpt') || name.includes('openai') || name.includes('gpt')) {
-    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg', bgClass: 'bg-[#10a37f] p-1.5', emoji: '🤖' };
+    return { logoUrl: 'https://cdn.simpleicons.org/openai/ffffff', bgClass: 'bg-[#10a37f] p-1.5', emoji: '🤖' };
   }
   if (name.includes('apple')) {
-    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/2/28/Apple_TV_logo.svg', bgClass: 'bg-black p-1.5', emoji: '🍎' };
+    return { logoUrl: 'https://cdn.simpleicons.org/apple/ffffff', bgClass: 'bg-black p-1.5', emoji: '🍎' };
   }
   if (name.includes('youtube')) {
-    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/0/09/YouTube_play_button_icon_%282013%E2%80%932017%29.svg', bgClass: 'bg-white p-1', emoji: '🔴' };
+    return { logoUrl: 'https://cdn.simpleicons.org/youtube/FF0000', bgClass: 'bg-white p-1', emoji: '🔴' };
   }
   return null;
 }
 
 // ── Custom Tick para el eje X que dibuja logo y nombre ──
 const CustomXAxisTick = (props: any) => {
-  const { x, y, payload } = props;
+  const { x, y, payload, logoErrors, setLogoErrors } = props;
   const platformName = payload.value;
   const rawName = platformName.replace('…', '');
   const details = getPlatformLogoDetails(rawName);
   const color = getPlatformBrandColor(rawName);
+  const hasError = logoErrors && logoErrors[rawName];
+  const showImage = details?.logoUrl && !hasError;
   
   return (
     <g transform={`translate(${x},${y})`}>
-      {details?.logoUrl ? (
+      {showImage ? (
         <g>
           {/* Círculo fondo blanco/negro según marca */}
           <circle cx={0} cy={14} r={11} fill={details.bgClass?.includes('bg-black') ? '#000000' : '#ffffff'} stroke="rgba(255,255,255,0.15)" strokeWidth={1} />
@@ -120,6 +122,11 @@ const CustomXAxisTick = (props: any) => {
             y={6.5}
             width={15}
             height={15}
+            onError={() => {
+              if (setLogoErrors) {
+                setLogoErrors((prev: any) => ({ ...prev, [rawName]: true }));
+              }
+            }}
           />
         </g>
       ) : (
@@ -128,13 +135,13 @@ const CustomXAxisTick = (props: any) => {
           <circle cx={0} cy={14} r={11} fill={color} />
           <text
             x={0}
-            y={17.5}
+            y={17}
             textAnchor="middle"
             fill="#ffffff"
             fontSize={9}
             fontWeight="bold"
           >
-            {rawName.includes('IPTV') ? '📺' : rawName.charAt(0).toUpperCase()}
+            {details?.emoji || (rawName.includes('IPTV') ? '📺' : rawName.charAt(0).toUpperCase())}
           </text>
         </g>
       )}
@@ -293,6 +300,7 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
   const [showDailyView, setShowDailyView] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [useOptimizedScale, setUseOptimizedScale] = useState(false);
+  const [logoErrors, setLogoErrors] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!user) return;
@@ -768,7 +776,7 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
               <div className="lg:col-span-7 xl:col-span-8 flex flex-col justify-between min-h-[300px]">
                 <ResponsiveContainer width="100%" height={290}>
                   <BarChart data={displayChartData} barCategoryGap="25%" margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
-                    <XAxis dataKey="name" tick={<CustomXAxisTick />} height={55} axisLine={false} tickLine={false} />
+                    <XAxis dataKey="name" tick={<CustomXAxisTick logoErrors={logoErrors} setLogoErrors={setLogoErrors} />} height={55} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
                     <Tooltip cursor={{ fill: 'hsl(var(--muted)/0.2)' }} content={<CustomChartTooltip />} />
                     <Bar dataKey="Costo" stackId="a" fill="hsl(var(--destructive)/0.2)" radius={[0, 0, 0, 0]} />
@@ -786,18 +794,26 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
                 {stats.platformStats.map(ps => {
                   const details = getPlatformLogoDetails(ps.platform);
                   const color = getPlatformBrandColor(ps.platform);
+                  const hasError = logoErrors[ps.platform];
+                  const showImage = details?.logoUrl && !hasError;
+                  
                   return (
                     <div key={ps.platform} className="bg-muted/10 dark:bg-zinc-900/30 border rounded-xl p-3.5 space-y-2 transition-all hover:bg-muted/20 dark:hover:bg-zinc-900/60">
                       {/* Logo y Nombre + Costo */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 min-w-0">
-                          {details?.logoUrl ? (
+                          {showImage ? (
                             <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 border border-white/10 ${details.bgClass || 'bg-white'}`}>
-                              <img src={details.logoUrl} alt={ps.platform} className="w-4 h-4 object-contain" />
+                              <img
+                                src={details.logoUrl}
+                                alt={ps.platform}
+                                className="w-4 h-4 object-contain"
+                                onError={() => setLogoErrors(prev => ({ ...prev, [ps.platform]: true }))}
+                              />
                             </div>
                           ) : (
                             <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-white font-bold text-[10px]" style={{ backgroundColor: color }}>
-                              {ps.platform.charAt(0).toUpperCase()}
+                              {details?.emoji || ps.platform.charAt(0).toUpperCase()}
                             </div>
                           )}
                           <span className="font-bold text-xs text-foreground truncate">{ps.platform}</span>
