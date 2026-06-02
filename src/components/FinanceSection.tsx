@@ -144,6 +144,7 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
   const [isSaving, setIsSaving] = useState(false);
   const [showDailyView, setShowDailyView] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [useOptimizedScale, setUseOptimizedScale] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -201,12 +202,45 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
     return calculateCurrentFinancialStats(subscriptions, masterAccounts, pricing);
   }, [subscriptions, masterAccounts, pricing]);
 
-  const chartData = stats.platformStats.map(ps => ({
-    name: ps.platform.length > 12 ? ps.platform.substring(0, 10) + '…' : ps.platform,
-    Ganancia: ps.profit,
-    Costo: ps.cost,
-    Ingreso: ps.revenue,
-  }));
+  const chartData = useMemo(() => {
+    return stats.platformStats.map(ps => ({
+      name: ps.platform.length > 12 ? ps.platform.substring(0, 10) + '…' : ps.platform,
+      Ganancia: ps.profit,
+      Costo: ps.cost,
+      Ingreso: ps.revenue,
+    }));
+  }, [stats.platformStats]);
+
+  const displayChartData = useMemo(() => {
+    if (!useOptimizedScale) {
+      return chartData;
+    }
+    const maxVal = Math.max(...chartData.map(d => d.Ingreso || 1));
+    return chartData.map(d => {
+      if (d.Ingreso <= 0) {
+        return {
+          ...d,
+          realCosto: d.Costo,
+          realGanancia: d.Ganancia,
+          realIngreso: d.Ingreso
+        };
+      }
+      const factor = d.Ingreso / maxVal;
+      // Compresión no lineal usando exponente 0.45 para acercar visualmente las plataformas chicas a las grandes
+      const visualTotal = maxVal * Math.pow(factor, 0.45);
+      const costRatio = d.Costo / d.Ingreso;
+      const visualCosto = visualTotal * costRatio;
+      const visualGanancia = visualTotal - visualCosto;
+      return {
+        ...d,
+        Costo: visualCosto,
+        Ganancia: visualGanancia,
+        realCosto: d.Costo,
+        realGanancia: d.Ganancia,
+        realIngreso: d.Ingreso
+      };
+    });
+  }, [chartData, useOptimizedScale]);
 
   // ── Datos mensuales para el gráfico de tendencia ──
   const currentMonthIdx = new Date().getMonth();
@@ -550,26 +584,78 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
       {/* Chart de Rentabilidad por plataforma */}
       {chartData.length > 0 && (
         <div className="bg-card rounded-xl border overflow-hidden animate-fade-in-up shadow-sm">
-          <div className="p-4 border-b flex justify-between items-center bg-muted/10">
+          <div className="p-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-muted/10">
             <div>
-              <h3 className="font-semibold text-sm sm:text-base">Análisis de Rentabilidad por Plataforma</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Ingresos divididos en Costo base (Abajo) y Ganancia Neta (Arriba)</p>
+              <h3 className="font-semibold text-sm sm:text-base flex items-center gap-1.5">
+                📊 Rentabilidad Mensual por Plataforma
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Comparativa de costos operativos e ingresos netos mensuales
+              </p>
+            </div>
+            
+            {/* Control de escala optimizada premium */}
+            <div className="flex items-center gap-2 bg-muted/30 px-2.5 py-1 rounded-lg border text-xs font-medium">
+              <span className="text-muted-foreground">Escala optimizada</span>
+              <button
+                type="button"
+                onClick={() => setUseOptimizedScale(p => !p)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  useOptimizedScale ? 'bg-emerald-500' : 'bg-muted'
+                }`}
+                title="Permite que las plataformas con menores ingresos sean claramente visibles"
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-background shadow ring-0 transition duration-200 ease-in-out ${
+                    useOptimizedScale ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                />
+              </button>
             </div>
           </div>
+
+          {/* Leyenda premium del gráfico stacked */}
+          <div className="px-4 py-3 bg-muted/5 border-b flex flex-wrap items-center justify-between gap-4 text-xs">
+            <div className="flex flex-wrap items-center gap-4">
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <span className="w-2.5 h-2.5 rounded-sm bg-destructive/20 border border-destructive/30 inline-block" />
+                📉 Costo base (Inversión)
+              </span>
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" />
+                💰 Ganancia Neta (Tu beneficio)
+              </span>
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <span className="w-2.5 h-0.5 bg-muted-foreground/60 inline-block" />
+                ⚡ Altura total = Ingreso Total
+              </span>
+            </div>
+            <span className="text-[10px] text-muted-foreground/80 italic hidden md:inline">
+              *Las cifras mostradas siempre reflejan el valor COP real de tu negocio
+            </span>
+          </div>
+
           <div className="p-4 pt-6">
             <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={chartData} barCategoryGap="25%" margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <BarChart data={displayChartData} barCategoryGap="25%" margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
                 <Tooltip
-                  cursor={{ fill: 'hsl(var(--muted)/0.4)' }}
-                  formatter={(value: number, name: string) => [formatCOP(value), name === 'Ganancia' ? '💰 Ganancia Neta' : '📉 Costos (Inversión)']}
+                  cursor={{ fill: 'hsl(var(--muted)/0.2)' }}
+                  formatter={(value: number, name: string, props: any) => {
+                    const data = props.payload;
+                    const isScaled = 'realCosto' in data;
+                    const realValue = name === 'Ganancia'
+                      ? (isScaled ? data.realGanancia : data.Ganancia)
+                      : (isScaled ? data.realCosto : data.Costo);
+                    return [formatCOP(realValue), name === 'Ganancia' ? '💰 Ganancia Neta' : '📉 Costo base (Inversión)'];
+                  }}
                   contentStyle={{ borderRadius: '12px', border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', fontSize: '13px', padding: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                   itemStyle={{ fontWeight: 600, padding: '2px 0' }}
                 />
-                <Bar dataKey="Costo" stackId="a" fill="hsl(var(--destructive)/0.25)" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="Costo" stackId="a" fill="hsl(var(--destructive)/0.2)" radius={[0, 0, 0, 0]} />
                 <Bar dataKey="Ganancia" stackId="a" radius={[6, 6, 0, 0]}>
-                  {chartData.map((entry, i) => (
+                  {displayChartData.map((entry, i) => (
                     <Cell key={i} fill={getPlatformBrandColor(entry.name)} />
                   ))}
                 </Bar>
