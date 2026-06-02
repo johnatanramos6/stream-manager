@@ -85,13 +85,16 @@ export function getPlatformLogoDetails(platform: string): { logoUrl?: string; bg
     return { logoUrl: 'https://cdn.simpleicons.org/canva/00C4CC', bgClass: 'bg-white p-1', emoji: '🎨' };
   }
   if (name.includes('capcut')) {
-    return { logoUrl: 'https://cdn.simpleicons.org/capcut/ffffff', bgClass: 'bg-black p-1.5', emoji: '🎬' };
+    return { logoUrl: './capcut-logo.jpg', bgClass: 'bg-white p-0.5', emoji: '🎬' };
   }
   if (name.includes('microsoft') || name.includes('office') || name.includes('365') || name.includes('m365')) {
     return { logoUrl: 'https://cdn.simpleicons.org/microsoftoffice/D83B01', bgClass: 'bg-white p-1', emoji: '💼' };
   }
   if (name.includes('chatgpt') || name.includes('openai') || name.includes('gpt')) {
-    return { logoUrl: 'https://cdn.simpleicons.org/openai/ffffff', bgClass: 'bg-[#10a37f] p-1.5', emoji: '🤖' };
+    return { logoUrl: './chatgpt-logo.jpg', bgClass: 'bg-zinc-900 p-0.5', emoji: '🤖' };
+  }
+  if (name.includes('gemini') || name.includes('google ai') || name.includes('googleai')) {
+    return { logoUrl: './gemini-logo.jpg', bgClass: 'bg-black p-0.5', emoji: '🧠' };
   }
   if (name.includes('apple')) {
     return { logoUrl: 'https://cdn.simpleicons.org/apple/ffffff', bgClass: 'bg-black p-1.5', emoji: '🍎' };
