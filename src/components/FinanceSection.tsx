@@ -49,7 +49,7 @@ export function getPlatformLogoDetails(platform: string): { logoUrl?: string; bg
     return { logoUrl: 'https://cdn.simpleicons.org/netflix/E50914', bgClass: 'bg-black p-1.5', emoji: '🎬' };
   }
   if (name.includes('amazon') || name.includes('prime')) {
-    return { logoUrl: 'https://cdn.simpleicons.org/primevideo/00A8E1', bgClass: 'bg-zinc-950 p-1', emoji: '📦' };
+    return { logoUrl: './primevideo-logo.png', bgClass: 'bg-white p-0.5', emoji: '📦' };
   }
   if (name.includes('claro')) {
     return { logoUrl: 'https://cdn.simpleicons.org/claro/EF3829', bgClass: 'bg-white p-1.5', emoji: '🔴' };
@@ -61,7 +61,7 @@ export function getPlatformLogoDetails(platform: string): { logoUrl?: string; bg
     return { logoUrl: 'https://cdn.simpleicons.org/hbo/ffffff', bgClass: 'bg-[#002BE7] p-1.5', emoji: '🟣' };
   }
   if (name.includes('disney') || name.includes('star')) {
-    return { logoUrl: 'https://cdn.simpleicons.org/disneyplus/ffffff', bgClass: 'bg-[#0b133a] p-1', emoji: '🏰' };
+    return { logoUrl: './disneyplus-logo.png', bgClass: 'bg-[#0b133a] p-0.5', emoji: '🏰' };
   }
   if (name.includes('crunchyroll') || name.includes('crunchy')) {
     return { logoUrl: 'https://cdn.simpleicons.org/crunchyroll/F47521', bgClass: 'bg-zinc-950 p-1', emoji: '🦊' };
@@ -74,6 +74,9 @@ export function getPlatformLogoDetails(platform: string): { logoUrl?: string; bg
   }
   if (name.includes('flujo')) {
     return { logoUrl: './flujo-logo.jpg', bgClass: 'bg-white p-1', emoji: '📺' };
+  }
+  if (name.includes('iptv') || name.includes('smarters')) {
+    return { logoUrl: './iptv-logo.jpg', bgClass: 'bg-zinc-950 p-0.5', emoji: '📺' };
   }
   if (name.includes('vix')) {
     return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/e/e0/ViX_logo.svg', bgClass: 'bg-white p-1', emoji: '🧡' };
