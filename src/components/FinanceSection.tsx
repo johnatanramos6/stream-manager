@@ -776,20 +776,22 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
           <div className="p-5">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* Columna Izquierda: Gráfico stacked con logos */}
-              <div className="lg:col-span-7 xl:col-span-8 flex flex-col justify-between min-h-[300px]">
-                <ResponsiveContainer width="100%" height={290}>
-                  <BarChart data={displayChartData} barCategoryGap="25%" margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
-                    <XAxis dataKey="name" tick={<CustomXAxisTick logoErrors={logoErrors} setLogoErrors={setLogoErrors} />} height={55} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
-                    <Tooltip cursor={{ fill: 'hsl(var(--muted)/0.2)' }} content={<CustomChartTooltip />} />
-                    <Bar dataKey="Costo" stackId="a" fill="hsl(var(--destructive)/0.2)" radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="Ganancia" stackId="a" radius={[6, 6, 0, 0]}>
-                      {displayChartData.map((entry, i) => (
-                        <Cell key={i} fill={getPlatformBrandColor(entry.name)} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="lg:col-span-7 xl:col-span-8 flex flex-col justify-between min-h-[300px] w-full overflow-x-auto scrollbar-thin">
+                <div className="min-w-[520px] lg:min-w-full h-[290px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={displayChartData} barCategoryGap="25%" margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+                      <XAxis dataKey="name" tick={<CustomXAxisTick logoErrors={logoErrors} setLogoErrors={setLogoErrors} />} interval={0} height={55} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip cursor={{ fill: 'hsl(var(--muted)/0.2)' }} content={<CustomChartTooltip />} />
+                      <Bar dataKey="Costo" stackId="a" fill="hsl(var(--destructive)/0.2)" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="Ganancia" stackId="a" radius={[6, 6, 0, 0]}>
+                        {displayChartData.map((entry, i) => (
+                          <Cell key={i} fill={getPlatformBrandColor(entry.name)} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
 
               {/* Columna Derecha: Tarjetas detalladas de plataforma tipo Mockup */}
