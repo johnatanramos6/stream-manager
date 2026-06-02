@@ -41,6 +41,154 @@ const getPlatformBrandColor = (name: string) => {
   return fallbacks[Math.abs(hash) % fallbacks.length];
 };
 
+// ── Helper para obtener logos de Wikimedia/locales ──
+export function getPlatformLogoDetails(platform: string): { logoUrl?: string; bgClass?: string; emoji?: string } | null {
+  const name = platform.toLowerCase().trim();
+  
+  if (name.includes('netflix')) {
+    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Netflix-new-icon.png', bgClass: 'bg-black', emoji: '🎬' };
+  }
+  if (name.includes('amazon') || name.includes('prime')) {
+    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/d/e4/Prime_Video_Logo.svg', bgClass: 'bg-white p-1', emoji: '📦' };
+  }
+  if (name.includes('claro')) {
+    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/a/ae/Claro_logo.svg', bgClass: 'bg-white p-1.5', emoji: '🔴' };
+  }
+  if (name.includes('paramount')) {
+    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/a/a5/Paramount%2B_logo.svg', bgClass: 'bg-[#0064FF] p-0.5', emoji: '🏔️' };
+  }
+  if (name.includes('max') || name.includes('hbo')) {
+    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/1/1a/Max_logo.svg', bgClass: 'bg-[#002BE7] p-1.5', emoji: '🟣' };
+  }
+  if (name.includes('disney') || name.includes('star')) {
+    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/3/3e/Disney%2B_logo.svg', bgClass: 'bg-[#0b133a] p-1.5', emoji: '🏰' };
+  }
+  if (name.includes('crunchyroll') || name.includes('crunchy')) {
+    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/0/0e/Crunchyroll_logo.svg', bgClass: 'bg-white p-1', emoji: '🦊' };
+  }
+  if (name.includes('spotify')) {
+    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/1/19/Spotify_logo_without_text.svg', bgClass: 'bg-black p-1', emoji: '🎵' };
+  }
+  if (name.includes('plex')) {
+    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/6/62/Plex_logo_%282022%29.svg', bgClass: 'bg-[#1f2326] p-1', emoji: '🟡' };
+  }
+  if (name.includes('flujo')) {
+    return { logoUrl: './flujo-logo.jpg', bgClass: 'bg-white p-1', emoji: '📺' };
+  }
+  if (name.includes('vix')) {
+    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/e/e0/ViX_logo.svg', bgClass: 'bg-white p-1', emoji: '🧡' };
+  }
+  if (name.includes('canva')) {
+    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/0/08/Canva_icon_2021.svg', bgClass: 'bg-white p-1', emoji: '🎨' };
+  }
+  if (name.includes('capcut')) {
+    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/f/f5/CapCut_logo.svg', bgClass: 'bg-white p-1.5', emoji: '🎬' };
+  }
+  if (name.includes('microsoft') || name.includes('office') || name.includes('365') || name.includes('m365')) {
+    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/5/5f/Microsoft_Office_logo_%282019%E2%80%93present%29.svg', bgClass: 'bg-white p-1', emoji: '💼' };
+  }
+  if (name.includes('chatgpt') || name.includes('openai') || name.includes('gpt')) {
+    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg', bgClass: 'bg-[#10a37f] p-1.5', emoji: '🤖' };
+  }
+  if (name.includes('apple')) {
+    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/2/28/Apple_TV_logo.svg', bgClass: 'bg-black p-1.5', emoji: '🍎' };
+  }
+  if (name.includes('youtube')) {
+    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/0/09/YouTube_play_button_icon_%282013%E2%80%932017%29.svg', bgClass: 'bg-white p-1', emoji: '🔴' };
+  }
+  return null;
+}
+
+// ── Custom Tick para el eje X que dibuja logo y nombre ──
+const CustomXAxisTick = (props: any) => {
+  const { x, y, payload } = props;
+  const platformName = payload.value;
+  const rawName = platformName.replace('…', '');
+  const details = getPlatformLogoDetails(rawName);
+  const color = getPlatformBrandColor(rawName);
+  
+  return (
+    <g transform={`translate(${x},${y})`}>
+      {details?.logoUrl ? (
+        <g>
+          {/* Círculo fondo blanco/negro según marca */}
+          <circle cx={0} cy={14} r={11} fill={details.bgClass?.includes('bg-black') ? '#000000' : '#ffffff'} stroke="rgba(255,255,255,0.15)" strokeWidth={1} />
+          {/* Logo SVG/Imagen */}
+          <image
+            href={details.logoUrl}
+            x={-7.5}
+            y={6.5}
+            width={15}
+            height={15}
+          />
+        </g>
+      ) : (
+        <g>
+          {/* Fallback de color de marca con el Emoji o inicial */}
+          <circle cx={0} cy={14} r={11} fill={color} />
+          <text
+            x={0}
+            y={17.5}
+            textAnchor="middle"
+            fill="#ffffff"
+            fontSize={9}
+            fontWeight="bold"
+          >
+            {rawName.includes('IPTV') ? '📺' : rawName.charAt(0).toUpperCase()}
+          </text>
+        </g>
+      )}
+      {/* Nombre de la plataforma */}
+      <text
+        x={0}
+        y={38}
+        textAnchor="middle"
+        fill="hsl(var(--muted-foreground))"
+        fontSize={10}
+        fontWeight={500}
+      >
+        {platformName}
+      </text>
+    </g>
+  );
+};
+
+// ── Custom Tooltip con contraste 100% perfecto ──
+const CustomChartTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    const isScaled = 'realCosto' in data;
+    const realCosto = isScaled ? data.realCosto : data.Costo;
+    const realGanancia = isScaled ? data.realGanancia : data.Ganancia;
+    const realIngreso = isScaled ? data.realIngreso : (data.Costo + data.Ganancia);
+    const platformName = data.name || '';
+    
+    return (
+      <div className="bg-zinc-950 text-zinc-100 border border-zinc-800 rounded-xl p-3.5 shadow-2xl space-y-2 min-w-[200px] text-xs">
+        <p className="font-bold border-b border-zinc-800 pb-1 text-sm flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: getPlatformBrandColor(platformName) }} />
+          {platformName}
+        </p>
+        <div className="space-y-1">
+          <div className="flex justify-between gap-4">
+            <span className="text-zinc-400 flex items-center gap-1">🔴 Costo base:</span>
+            <span className="font-semibold text-red-400">{formatCOP(realCosto)}</span>
+          </div>
+          <div className="flex justify-between gap-4">
+            <span className="text-zinc-400 flex items-center gap-1">🟢 Ganancia Neta:</span>
+            <span className="font-semibold text-emerald-400">{formatCOP(realGanancia)}</span>
+          </div>
+          <div className="flex justify-between gap-4 border-t border-zinc-800 pt-1 font-bold text-sm">
+            <span className="text-zinc-200">⚡ Ingreso Total:</span>
+            <span className="text-indigo-400">{formatCOP(realIngreso)}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 // ── Helper: ventas de un día específico (simple, sin prorrateo) ──
 interface DailySale {
   clientName: string;
@@ -586,8 +734,8 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
         <div className="bg-card rounded-xl border overflow-hidden animate-fade-in-up shadow-sm">
           <div className="p-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-muted/10">
             <div>
-              <h3 className="font-semibold text-sm sm:text-base flex items-center gap-1.5">
-                📊 Rentabilidad Mensual por Plataforma
+              <h3 className="font-semibold text-sm sm:text-base flex items-center gap-1.5 text-foreground">
+                Rentabilidad Mensual por Plataforma
               </h3>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Comparativa de costos operativos e ingresos netos mensuales
@@ -614,53 +762,87 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
             </div>
           </div>
 
-          {/* Leyenda premium del gráfico stacked */}
-          <div className="px-4 py-3 bg-muted/5 border-b flex flex-wrap items-center justify-between gap-4 text-xs">
-            <div className="flex flex-wrap items-center gap-4">
+          <div className="p-5">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Columna Izquierda: Gráfico stacked con logos */}
+              <div className="lg:col-span-7 xl:col-span-8 flex flex-col justify-between min-h-[300px]">
+                <ResponsiveContainer width="100%" height={290}>
+                  <BarChart data={displayChartData} barCategoryGap="25%" margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+                    <XAxis dataKey="name" tick={<CustomXAxisTick />} height={55} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip cursor={{ fill: 'hsl(var(--muted)/0.2)' }} content={<CustomChartTooltip />} />
+                    <Bar dataKey="Costo" stackId="a" fill="hsl(var(--destructive)/0.2)" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="Ganancia" stackId="a" radius={[6, 6, 0, 0]}>
+                      {displayChartData.map((entry, i) => (
+                        <Cell key={i} fill={getPlatformBrandColor(entry.name)} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Columna Derecha: Tarjetas detalladas de plataforma tipo Mockup */}
+              <div className="lg:col-span-5 xl:col-span-4 space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
+                {stats.platformStats.map(ps => {
+                  const details = getPlatformLogoDetails(ps.platform);
+                  const color = getPlatformBrandColor(ps.platform);
+                  return (
+                    <div key={ps.platform} className="bg-muted/10 dark:bg-zinc-900/30 border rounded-xl p-3.5 space-y-2 transition-all hover:bg-muted/20 dark:hover:bg-zinc-900/60">
+                      {/* Logo y Nombre + Costo */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {details?.logoUrl ? (
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 border border-white/10 ${details.bgClass || 'bg-white'}`}>
+                              <img src={details.logoUrl} alt={ps.platform} className="w-4 h-4 object-contain" />
+                            </div>
+                          ) : (
+                            <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-white font-bold text-[10px]" style={{ backgroundColor: color }}>
+                              {ps.platform.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <span className="font-bold text-xs text-foreground truncate">{ps.platform}</span>
+                        </div>
+                        <span className="text-red-500 dark:text-red-400 font-semibold text-xs shrink-0">{formatCOP(ps.cost)}</span>
+                      </div>
+                      
+                      {/* Margen y Totales */}
+                      <div className="grid grid-cols-2 gap-2 border-t border-zinc-800/30 pt-2 text-xs">
+                        <div>
+                          <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            {ps.marginPercent.toFixed(0)}%
+                          </div>
+                          <div className="text-[9px] text-muted-foreground font-medium mt-0.5">Margen</div>
+                        </div>
+                        <div className="text-right space-y-0.5 min-w-0">
+                          <div className="text-emerald-600 dark:text-emerald-400 font-bold truncate">{formatCOP(ps.profit)}</div>
+                          <div className="text-foreground font-bold text-xs truncate">{formatCOP(ps.revenue)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Leyenda premium e indicador de ganancia mensual al pie */}
+          <div className="px-4 py-3 bg-muted/5 border-t flex flex-col sm:flex-row justify-between items-center gap-3">
+            <div className="flex flex-wrap items-center gap-4 text-xs">
               <span className="flex items-center gap-1.5 text-muted-foreground">
                 <span className="w-2.5 h-2.5 rounded-sm bg-destructive/20 border border-destructive/30 inline-block" />
-                📉 Costo base (Inversión)
+                Costo (Inversión)
               </span>
               <span className="flex items-center gap-1.5 text-muted-foreground">
                 <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" />
-                💰 Ganancia Neta (Tu beneficio)
-              </span>
-              <span className="flex items-center gap-1.5 text-muted-foreground">
-                <span className="w-2.5 h-0.5 bg-muted-foreground/60 inline-block" />
-                ⚡ Altura total = Ingreso Total
+                Ganancia Neta (Tu beneficio)
               </span>
             </div>
-            <span className="text-[10px] text-muted-foreground/80 italic hidden md:inline">
-              *Las cifras mostradas siempre reflejan el valor COP real de tu negocio
-            </span>
-          </div>
-
-          <div className="p-4 pt-6">
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={displayChartData} barCategoryGap="25%" margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip
-                  cursor={{ fill: 'hsl(var(--muted)/0.2)' }}
-                  formatter={(value: number, name: string, props: any) => {
-                    const data = props.payload;
-                    const isScaled = 'realCosto' in data;
-                    const realValue = name === 'Ganancia'
-                      ? (isScaled ? data.realGanancia : data.Ganancia)
-                      : (isScaled ? data.realCosto : data.Costo);
-                    return [formatCOP(realValue), name === 'Ganancia' ? '💰 Ganancia Neta' : '📉 Costo base (Inversión)'];
-                  }}
-                  contentStyle={{ borderRadius: '12px', border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', fontSize: '13px', padding: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                  itemStyle={{ fontWeight: 600, padding: '2px 0' }}
-                />
-                <Bar dataKey="Costo" stackId="a" fill="hsl(var(--destructive)/0.2)" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="Ganancia" stackId="a" radius={[6, 6, 0, 0]}>
-                  {displayChartData.map((entry, i) => (
-                    <Cell key={i} fill={getPlatformBrandColor(entry.name)} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            
+            <div className="bg-muted/30 dark:bg-zinc-800/40 px-4 py-1.5 rounded-full border text-xs font-semibold text-foreground flex items-center gap-2">
+              <span className="text-muted-foreground">Total Mensual de Ganancia:</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold">{formatCOP(stats.totalProfit)}</span>
+            </div>
           </div>
         </div>
       )}
