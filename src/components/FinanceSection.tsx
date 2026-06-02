@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { DollarSign, TrendingUp, TrendingDown, Users, Monitor, Save, AlertCircle, Plus, X, ChevronLeft, ChevronRight, CalendarDays, Loader2, Calendar, Eye, EyeOff } from 'lucide-react';
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
 import { MasterAccount } from '@/types/masterAccount';
-import { calculateCurrentFinancialStats, calculateMonthlyFinancialSnapshots, getSubscriptionRevenue, getStockSubscriptionCost, getMasterAccountMonthlyCost, FINANCE_MONTH_FULL, FINANCE_MONTH_NAMES } from '@/lib/finance';
+import { calculateCurrentFinancialStats, calculateMonthlyFinancialSnapshots, FINANCE_MONTH_FULL, FINANCE_MONTH_NAMES } from '@/lib/finance';
 
 interface Props {
   subscriptions: Subscription[];
@@ -41,70 +41,98 @@ const getPlatformBrandColor = (name: string) => {
   return fallbacks[Math.abs(hash) % fallbacks.length];
 };
 
-// ── Helper: calcular finanzas de un día específico ──
+// ── Helper: ventas de un día específico (simple, sin prorrateo) ──
+interface DailySale {
+  clientName: string;
+  platform: string;
+  profiles: number;
+  income: number;
+  cost: number;
+  profit: number;
+}
+
+interface DailyPlatformSummary {
+  platform: string;
+  count: number;
+  profiles: number;
+  income: number;
+  cost: number;
+  profit: number;
+}
+
+interface DailyStatsResult {
+  sales: DailySale[];
+  platformSummary: DailyPlatformSummary[];
+  totalIncome: number;
+  totalCost: number;
+  totalProfit: number;
+  totalSales: number;
+  totalProfiles: number;
+}
+
 function calculateDailyStats(
   subscriptions: Subscription[],
   masterAccounts: MasterAccount[],
   pricing: PlatformPricing[],
   targetDate: Date
-) {
+): DailyStatsResult {
   const pricingMap = new Map(pricing.map(p => [p.platform, p]));
   const masterAccountsMap = new Map(masterAccounts.map(ma => [ma.id, ma]));
   const dateStr = targetDate.toISOString().split('T')[0];
 
-  // Suscripciones activas en ese día
-  const activeSubs = subscriptions.filter(sub => {
-    const purchaseDate = sub.purchaseDate;
-    const days = sub.duration_days || 30;
-    const start = new Date(purchaseDate + 'T12:00:00');
-    const end = new Date(start);
-    end.setDate(end.getDate() + days);
-    const target = new Date(dateStr + 'T12:00:00');
-    return target >= start && target <= end;
-  });
+  // Solo suscripciones vendidas/creadas ese día exacto
+  const soldThatDay = subscriptions.filter(sub => sub.purchaseDate === dateStr);
 
-  // Suscripciones creadas ese día
-  const createdSubs = subscriptions.filter(sub => sub.purchaseDate === dateStr);
+  const sales: DailySale[] = [];
+  const platformMap = new Map<string, DailyPlatformSummary>();
 
-  // Suscripciones que vencen ese día
-  const expiringSubs = subscriptions.filter(sub => {
-    const start = new Date(sub.purchaseDate + 'T12:00:00');
-    const end = new Date(start);
-    end.setDate(end.getDate() + (sub.duration_days || 30));
-    const endStr = end.toISOString().split('T')[0];
-    return endStr === dateStr;
-  });
-
-  let revenue = 0;
-  let cost = 0;
-  activeSubs.forEach(sub => {
+  soldThatDay.forEach(sub => {
     const pricingConfig = pricingMap.get(sub.platform);
-    const subRevenue = getSubscriptionRevenue(sub, pricingConfig);
-    // Prorrateado diario
-    const days = sub.duration_days || 30;
-    revenue += subRevenue / 30 * 1; // Revenue mensual / 30 = diario
+    const profiles = Math.max(1, sub.profiles_sold || 1);
 
+    // Ingreso real: precio de venta override o (precio venta x perfiles)
+    const income = sub.salePriceOverride ?? ((pricingConfig?.salePrice || 0) * profiles);
+
+    // Costo real
+    let cost = 0;
     if (sub.master_account_id) {
       const ma = masterAccountsMap.get(sub.master_account_id);
-      if (ma) {
-        cost += getStockSubscriptionCost(sub, ma) / 30;
+      if (ma && ma.total_profiles > 0) {
+        cost = (ma.purchase_price / ma.total_profiles) * profiles;
       }
     } else {
       const costPrice = pricingConfig?.costPrice || 0;
-      cost += costPrice / 30;
+      const costType = pricingConfig?.costType || 'per_screen';
+      cost = costType === 'per_account' ? costPrice : costPrice * profiles;
+    }
+
+    const profit = income - cost;
+
+    sales.push({ clientName: sub.clientName, platform: sub.platform, profiles, income, cost, profit });
+
+    // Agrupar por plataforma
+    const existing = platformMap.get(sub.platform);
+    if (existing) {
+      existing.count++;
+      existing.profiles += profiles;
+      existing.income += income;
+      existing.cost += cost;
+      existing.profit += profit;
+    } else {
+      platformMap.set(sub.platform, { platform: sub.platform, count: 1, profiles, income, cost, profit });
     }
   });
 
-  const profit = revenue - cost;
+  const platformSummary = Array.from(platformMap.values()).sort((a, b) => b.income - a.income);
 
   return {
-    activeSubs: activeSubs.length,
-    createdSubs: createdSubs.length,
-    expiringSubs: expiringSubs.length,
-    revenue,
-    cost,
-    profit,
-    details: activeSubs,
+    sales,
+    platformSummary,
+    totalIncome: sales.reduce((a, s) => a + s.income, 0),
+    totalCost: sales.reduce((a, s) => a + s.cost, 0),
+    totalProfit: sales.reduce((a, s) => a + s.profit, 0),
+    totalSales: sales.length,
+    totalProfiles: sales.reduce((a, s) => a + s.profiles, 0),
   };
 }
 
@@ -290,32 +318,108 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
             <p className="text-xs text-muted-foreground capitalize">{dayLabel}</p>
 
             {dailyStats && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                <div className="p-3 rounded-lg bg-primary/5 border border-primary/10 text-center">
-                  <p className="text-lg font-bold text-primary">{dailyStats.activeSubs}</p>
-                  <p className="text-[10px] text-muted-foreground">Suscripciones activas</p>
+              <>
+                {/* Resumen del día */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                  <div className="p-3 rounded-lg bg-primary/5 border border-primary/10 text-center">
+                    <p className="text-xl font-bold text-primary">{dailyStats.totalSales}</p>
+                    <p className="text-[10px] text-muted-foreground">Ventas realizadas</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/10 text-center">
+                    <p className="text-xl font-bold text-amber-500">{dailyStats.totalProfiles}</p>
+                    <p className="text-[10px] text-muted-foreground">Pantallas vendidas</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/10 text-center">
+                    <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{formatCOP(dailyStats.totalIncome)}</p>
+                    <p className="text-[10px] text-muted-foreground">Ingreso total del día</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-red-500/5 border border-red-500/10 text-center">
+                    <p className="text-xl font-bold text-red-500">{formatCOP(dailyStats.totalCost)}</p>
+                    <p className="text-[10px] text-muted-foreground">Costo total del día</p>
+                  </div>
+                  <div className={`p-3 rounded-lg text-center border col-span-2 sm:col-span-1 ${dailyStats.totalProfit >= 0 ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-red-500/5 border-red-500/10'}`}>
+                    <p className={`text-xl font-bold ${dailyStats.totalProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>{formatCOP(dailyStats.totalProfit)}</p>
+                    <p className="text-[10px] text-muted-foreground">Ganancia del día</p>
+                  </div>
                 </div>
-                <div className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/10 text-center">
-                  <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{dailyStats.createdSubs}</p>
-                  <p className="text-[10px] text-muted-foreground">Nuevas ese día</p>
-                </div>
-                <div className="p-3 rounded-lg bg-red-500/5 border border-red-500/10 text-center">
-                  <p className="text-lg font-bold text-red-500">{dailyStats.expiringSubs}</p>
-                  <p className="text-[10px] text-muted-foreground">Vencen ese día</p>
-                </div>
-                <div className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/10 text-center">
-                  <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{formatCOP(dailyStats.revenue)}</p>
-                  <p className="text-[10px] text-muted-foreground">Ingreso diario prorrat.</p>
-                </div>
-                <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/10 text-center">
-                  <p className="text-lg font-bold text-orange-500">{formatCOP(dailyStats.cost)}</p>
-                  <p className="text-[10px] text-muted-foreground">Costo diario prorrat.</p>
-                </div>
-                <div className={`p-3 rounded-lg text-center border ${dailyStats.profit >= 0 ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-red-500/5 border-red-500/10'}`}>
-                  <p className={`text-lg font-bold ${dailyStats.profit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>{formatCOP(dailyStats.profit)}</p>
-                  <p className="text-[10px] text-muted-foreground">Ganancia diaria prorrat.</p>
-                </div>
-              </div>
+
+                {/* Sin ventas ese día */}
+                {dailyStats.totalSales === 0 && (
+                  <div className="text-center py-6 text-muted-foreground">
+                    <Calendar className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">No se registraron ventas este día</p>
+                  </div>
+                )}
+
+                {/* Resumen por plataforma */}
+                {dailyStats.platformSummary.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">📱 Plataformas vendidas</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {dailyStats.platformSummary.map(ps => (
+                        <div key={ps.platform} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/10 hover:bg-muted/20 transition-colors">
+                          <div className="w-1 h-10 rounded-full" style={{ backgroundColor: getPlatformBrandColor(ps.platform) }} />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{ps.platform}</p>
+                            <p className="text-[10px] text-muted-foreground">{ps.count} venta{ps.count > 1 ? 's' : ''} · {ps.profiles} pantalla{ps.profiles > 1 ? 's' : ''}</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{formatCOP(ps.income)}</p>
+                            <p className="text-[10px] text-muted-foreground">ingreso</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Detalle de cada venta */}
+                {dailyStats.sales.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">📋 Detalle de ventas</p>
+                    <div className="overflow-x-auto rounded-lg border">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-muted/50">
+                            <th className="text-left p-2.5 font-semibold text-xs">Cliente</th>
+                            <th className="text-left p-2.5 font-semibold text-xs">Plataforma</th>
+                            <th className="text-right p-2.5 font-semibold text-xs">Pantallas</th>
+                            <th className="text-right p-2.5 font-semibold text-xs">Ingreso</th>
+                            <th className="text-right p-2.5 font-semibold text-xs">Costo</th>
+                            <th className="text-right p-2.5 font-semibold text-xs">Ganancia</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dailyStats.sales.map((sale, idx) => (
+                            <tr key={idx} className="border-t hover:bg-muted/20 transition-colors">
+                              <td className="p-2.5 font-medium">{sale.clientName}</td>
+                              <td className="p-2.5">
+                                <span className="inline-flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: getPlatformBrandColor(sale.platform) }} />
+                                  {sale.platform}
+                                </span>
+                              </td>
+                              <td className="p-2.5 text-right">{sale.profiles}</td>
+                              <td className="p-2.5 text-right text-blue-600 dark:text-blue-400">{formatCOP(sale.income)}</td>
+                              <td className="p-2.5 text-right text-red-500">{formatCOP(sale.cost)}</td>
+                              <td className="p-2.5 text-right font-bold text-emerald-600 dark:text-emerald-400">{formatCOP(sale.profit)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t bg-muted/30 font-bold">
+                            <td className="p-2.5" colSpan={2}>Total</td>
+                            <td className="p-2.5 text-right">{dailyStats.totalProfiles}</td>
+                            <td className="p-2.5 text-right text-blue-600 dark:text-blue-400">{formatCOP(dailyStats.totalIncome)}</td>
+                            <td className="p-2.5 text-right text-red-500">{formatCOP(dailyStats.totalCost)}</td>
+                            <td className="p-2.5 text-right text-emerald-600 dark:text-emerald-400">{formatCOP(dailyStats.totalProfit)}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
