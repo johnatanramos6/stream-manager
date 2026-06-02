@@ -6,10 +6,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { DollarSign, TrendingUp, TrendingDown, Users, Monitor, Save, AlertCircle, Plus, X, ChevronLeft, ChevronRight, CalendarDays, Loader2 } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Users, Monitor, Save, AlertCircle, Plus, X, ChevronLeft, ChevronRight, CalendarDays, Loader2, Calendar, Eye, EyeOff } from 'lucide-react';
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
 import { MasterAccount } from '@/types/masterAccount';
-import { calculateCurrentFinancialStats, calculateMonthlyFinancialSnapshots, FINANCE_MONTH_FULL, FINANCE_MONTH_NAMES } from '@/lib/finance';
+import { calculateCurrentFinancialStats, calculateMonthlyFinancialSnapshots, getSubscriptionRevenue, getStockSubscriptionCost, getMasterAccountMonthlyCost, FINANCE_MONTH_FULL, FINANCE_MONTH_NAMES } from '@/lib/finance';
 
 interface Props {
   subscriptions: Subscription[];
@@ -41,12 +41,81 @@ const getPlatformBrandColor = (name: string) => {
   return fallbacks[Math.abs(hash) % fallbacks.length];
 };
 
+// ── Helper: calcular finanzas de un día específico ──
+function calculateDailyStats(
+  subscriptions: Subscription[],
+  masterAccounts: MasterAccount[],
+  pricing: PlatformPricing[],
+  targetDate: Date
+) {
+  const pricingMap = new Map(pricing.map(p => [p.platform, p]));
+  const masterAccountsMap = new Map(masterAccounts.map(ma => [ma.id, ma]));
+  const dateStr = targetDate.toISOString().split('T')[0];
+
+  // Suscripciones activas en ese día
+  const activeSubs = subscriptions.filter(sub => {
+    const purchaseDate = sub.purchaseDate;
+    const days = sub.duration_days || 30;
+    const start = new Date(purchaseDate + 'T12:00:00');
+    const end = new Date(start);
+    end.setDate(end.getDate() + days);
+    const target = new Date(dateStr + 'T12:00:00');
+    return target >= start && target <= end;
+  });
+
+  // Suscripciones creadas ese día
+  const createdSubs = subscriptions.filter(sub => sub.purchaseDate === dateStr);
+
+  // Suscripciones que vencen ese día
+  const expiringSubs = subscriptions.filter(sub => {
+    const start = new Date(sub.purchaseDate + 'T12:00:00');
+    const end = new Date(start);
+    end.setDate(end.getDate() + (sub.duration_days || 30));
+    const endStr = end.toISOString().split('T')[0];
+    return endStr === dateStr;
+  });
+
+  let revenue = 0;
+  let cost = 0;
+  activeSubs.forEach(sub => {
+    const pricingConfig = pricingMap.get(sub.platform);
+    const subRevenue = getSubscriptionRevenue(sub, pricingConfig);
+    // Prorrateado diario
+    const days = sub.duration_days || 30;
+    revenue += subRevenue / 30 * 1; // Revenue mensual / 30 = diario
+
+    if (sub.master_account_id) {
+      const ma = masterAccountsMap.get(sub.master_account_id);
+      if (ma) {
+        cost += getStockSubscriptionCost(sub, ma) / 30;
+      }
+    } else {
+      const costPrice = pricingConfig?.costPrice || 0;
+      cost += costPrice / 30;
+    }
+  });
+
+  const profit = revenue - cost;
+
+  return {
+    activeSubs: activeSubs.length,
+    createdSubs: createdSubs.length,
+    expiringSubs: expiringSubs.length,
+    revenue,
+    cost,
+    profit,
+    details: activeSubs,
+  };
+}
+
 export default function FinanceSection({ subscriptions, masterAccounts, onPricingSaved }: Props) {
   const { user } = useAuth();
   const [pricing, setPricing] = useState<PlatformPricing[]>(DEFAULT_PRICING);
   const [editing, setEditing] = useState(false);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [isSaving, setIsSaving] = useState(false);
+  const [showDailyView, setShowDailyView] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     if (!user) return;
@@ -121,8 +190,12 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
   const realMonths = monthlyData.filter(m => !m.isFuture);
   const annualTotal = realMonths.reduce((acc, m) => acc + (m.Ingresos || 0), 0);
   const annualProfit = realMonths.reduce((acc, m) => acc + (m.Ganancia || 0), 0);
+  const annualCost = realMonths.reduce((acc, m) => acc + (m.Costos || 0), 0);
   const currentMonthRevenue = monthlyData[currentMonthIdx]?.Ingresos || 0;
+  const currentMonthProfit = monthlyData[currentMonthIdx]?.Ganancia || 0;
+  const currentMonthCost = monthlyData[currentMonthIdx]?.Costos || 0;
   const prevMonthRevenue = currentMonthIdx > 0 ? (monthlyData[currentMonthIdx - 1]?.Ingresos || 0) : 0;
+  const prevMonthProfit = currentMonthIdx > 0 ? (monthlyData[currentMonthIdx - 1]?.Ganancia || 0) : 0;
   const trendPercent = prevMonthRevenue > 0 ? ((currentMonthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100 : 0;
   const isGrowing = trendPercent >= 0;
 
@@ -135,6 +208,15 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
     });
     return Array.from(years).sort((a, b) => b - a);
   }, [subscriptions]);
+
+  // ── Daily stats ──
+  const dailyStats = useMemo(() => {
+    if (!showDailyView) return null;
+    return calculateDailyStats(subscriptions, masterAccounts, pricing, new Date(selectedDate + 'T12:00:00'));
+  }, [showDailyView, selectedDate, subscriptions, masterAccounts, pricing]);
+
+  const selectedDateObj = new Date(selectedDate + 'T12:00:00');
+  const dayLabel = selectedDateObj.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -172,6 +254,73 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
         </div>
       )}
 
+      {/* ── Vista Diaria Desplegable ── */}
+      <div className="bg-card rounded-xl border overflow-hidden animate-fade-in-up shadow-sm">
+        <button
+          onClick={() => setShowDailyView(p => !p)}
+          className="w-full p-4 flex items-center justify-between hover:bg-muted/10 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-primary" />
+            <h3 className="font-semibold text-sm sm:text-base">Finanzas por Día</h3>
+            <span className="text-xs text-muted-foreground ml-1">— Consulta las métricas de un día específico</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {showDailyView ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+          </div>
+        </button>
+
+        {showDailyView && (
+          <div className="border-t p-4 space-y-4">
+            {/* Date picker */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <label className="text-sm font-medium text-muted-foreground">Seleccionar fecha:</label>
+              <Input
+                type="date"
+                value={selectedDate}
+                onChange={e => setSelectedDate(e.target.value)}
+                className="w-auto"
+              />
+              <Button size="sm" variant="outline" onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}>
+                Hoy
+              </Button>
+            </div>
+
+            {/* Day label */}
+            <p className="text-xs text-muted-foreground capitalize">{dayLabel}</p>
+
+            {dailyStats && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div className="p-3 rounded-lg bg-primary/5 border border-primary/10 text-center">
+                  <p className="text-lg font-bold text-primary">{dailyStats.activeSubs}</p>
+                  <p className="text-[10px] text-muted-foreground">Suscripciones activas</p>
+                </div>
+                <div className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/10 text-center">
+                  <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{dailyStats.createdSubs}</p>
+                  <p className="text-[10px] text-muted-foreground">Nuevas ese día</p>
+                </div>
+                <div className="p-3 rounded-lg bg-red-500/5 border border-red-500/10 text-center">
+                  <p className="text-lg font-bold text-red-500">{dailyStats.expiringSubs}</p>
+                  <p className="text-[10px] text-muted-foreground">Vencen ese día</p>
+                </div>
+                <div className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/10 text-center">
+                  <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{formatCOP(dailyStats.revenue)}</p>
+                  <p className="text-[10px] text-muted-foreground">Ingreso diario prorrat.</p>
+                </div>
+                <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/10 text-center">
+                  <p className="text-lg font-bold text-orange-500">{formatCOP(dailyStats.cost)}</p>
+                  <p className="text-[10px] text-muted-foreground">Costo diario prorrat.</p>
+                </div>
+                <div className={`p-3 rounded-lg text-center border ${dailyStats.profit >= 0 ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-red-500/5 border-red-500/10'}`}>
+                  <p className={`text-lg font-bold ${dailyStats.profit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>{formatCOP(dailyStats.profit)}</p>
+                  <p className="text-[10px] text-muted-foreground">Ganancia diaria prorrat.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* ── Gráfico de Tendencia Mensual ── */}
       <div className="bg-card rounded-xl border overflow-hidden animate-fade-in-up shadow-sm">
         <div className="p-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-muted/10">
@@ -192,26 +341,56 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
           </div>
         </div>
 
-        {/* Tarjetas de resumen anual */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 border-b bg-muted/5">
-          <div className="text-center p-3 rounded-lg bg-primary/5 border border-primary/10">
-            <p className="text-lg sm:text-xl font-bold text-primary">{formatCOP(annualTotal)}</p>
-            <p className="text-[10px] text-muted-foreground">Facturado {selectedYear}</p>
+        {/* ── Resumen Anual Acumulado ── */}
+        <div className="p-4 border-b bg-muted/5">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+            📊 Acumulado del año {selectedYear} <span className="normal-case font-normal">(suma de todos los meses transcurridos)</span>
+          </p>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="text-center p-3 rounded-lg bg-primary/5 border border-primary/10">
+              <p className="text-lg sm:text-xl font-bold text-primary">{formatCOP(annualTotal)}</p>
+              <p className="text-[10px] text-muted-foreground">Total facturado</p>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-red-500/5 border border-red-500/10">
+              <p className="text-lg sm:text-xl font-bold text-red-500">{formatCOP(annualCost)}</p>
+              <p className="text-[10px] text-muted-foreground">Total costos</p>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
+              <p className="text-lg sm:text-xl font-bold text-emerald-600 dark:text-emerald-400">{formatCOP(annualProfit)}</p>
+              <p className="text-[10px] text-muted-foreground">Total ganancia neta</p>
+            </div>
           </div>
-          <div className="text-center p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
-            <p className="text-lg sm:text-xl font-bold text-emerald-600 dark:text-emerald-400">{formatCOP(annualProfit)}</p>
-            <p className="text-[10px] text-muted-foreground">Ganancia {selectedYear}</p>
-          </div>
-          <div className="text-center p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
-            <p className="text-lg sm:text-xl font-bold text-blue-600 dark:text-blue-400">{formatCOP(currentMonthRevenue)}</p>
-            <p className="text-[10px] text-muted-foreground">{FINANCE_MONTH_FULL[currentMonthIdx]} (actual)</p>
-          </div>
-          <div className={`text-center p-3 rounded-lg border ${isGrowing ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-red-500/5 border-red-500/10'}`}>
-            <p className={`text-lg sm:text-xl font-bold flex items-center justify-center gap-1 ${isGrowing ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
-              {isGrowing ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-              {prevMonthRevenue > 0 ? `${trendPercent > 0 ? '+' : ''}${trendPercent.toFixed(1)}%` : '—'}
-            </p>
-            <p className="text-[10px] text-muted-foreground">vs. {currentMonthIdx > 0 ? FINANCE_MONTH_FULL[currentMonthIdx - 1] : '—'}</p>
+        </div>
+
+        {/* ── Comparativa mes actual vs anterior ── */}
+        <div className="p-4 border-b bg-muted/5">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+            📅 Comparativa mensual
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="text-center p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
+              <p className="text-lg sm:text-xl font-bold text-blue-600 dark:text-blue-400">{formatCOP(currentMonthRevenue)}</p>
+              <p className="text-[10px] text-muted-foreground font-medium">Ingresos de {FINANCE_MONTH_FULL[currentMonthIdx]}</p>
+              <p className="text-[9px] text-muted-foreground/70 mt-0.5">Solo este mes</p>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
+              <p className="text-lg sm:text-xl font-bold text-emerald-600 dark:text-emerald-400">{formatCOP(currentMonthProfit)}</p>
+              <p className="text-[10px] text-muted-foreground font-medium">Ganancia de {FINANCE_MONTH_FULL[currentMonthIdx]}</p>
+              <p className="text-[9px] text-muted-foreground/70 mt-0.5">Solo este mes</p>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-muted/30 border">
+              <p className="text-lg sm:text-xl font-bold text-muted-foreground">{formatCOP(prevMonthRevenue)}</p>
+              <p className="text-[10px] text-muted-foreground font-medium">Ingresos de {currentMonthIdx > 0 ? FINANCE_MONTH_FULL[currentMonthIdx - 1] : '—'}</p>
+              <p className="text-[9px] text-muted-foreground/70 mt-0.5">Mes anterior</p>
+            </div>
+            <div className={`text-center p-3 rounded-lg border ${isGrowing ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-red-500/5 border-red-500/10'}`}>
+              <p className={`text-lg sm:text-xl font-bold flex items-center justify-center gap-1 ${isGrowing ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
+                {isGrowing ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                {prevMonthRevenue > 0 ? `${trendPercent > 0 ? '+' : ''}${trendPercent.toFixed(1)}%` : '—'}
+              </p>
+              <p className="text-[10px] text-muted-foreground font-medium">Variación</p>
+              <p className="text-[9px] text-muted-foreground/70 mt-0.5">{FINANCE_MONTH_FULL[currentMonthIdx]} vs {currentMonthIdx > 0 ? FINANCE_MONTH_FULL[currentMonthIdx - 1] : '—'}</p>
+            </div>
           </div>
         </div>
 
