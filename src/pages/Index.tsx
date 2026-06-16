@@ -6,6 +6,7 @@ import SubscriptionTable from '@/components/SubscriptionTable';
 import StatsBar, { QuickFilter } from '@/components/StatsBar';
 import FinanceSection from '@/components/FinanceSection';
 import AccountsSection from '@/components/AccountsSection';
+import StorefrontAdmin from '@/components/StorefrontAdmin';
 import { MasterAccount } from '@/types/masterAccount';
 import ThemeToggle from '@/components/ThemeToggle';
 import InstallPWA from '@/components/InstallPWA';
@@ -17,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Plus, Search, Tv, DollarSign, Download, Upload, Filter, X, LogOut, Package } from 'lucide-react';
+import { Plus, Search, Tv, DollarSign, Download, Upload, Filter, X, LogOut, Package, Store } from 'lucide-react';
 import { useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
@@ -228,14 +229,14 @@ function IndexContent() {
   const [search, setSearch] = useState('');
   const [filterPlatform, setFilterPlatform] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<'clients' | 'accounts' | 'finance'>('clients');
+  const [activeTab, setActiveTab] = useState<'clients' | 'accounts' | 'finance' | 'store'>('clients');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
   const [showAdmin, setShowAdmin] = useState(false);
   const [pricingConfig, setPricingConfig] = useState(DEFAULT_PRICING);
   const [masterAccounts, setMasterAccounts] = useState<MasterAccount[]>([]);
-  const [notifyState, setNotifyState] = useState<{ open: boolean, clients: Subscription[], newPassword: string, platform: string }>({ open: false, clients: [], newPassword: '', platform: '' });
+  const [notifyState, setNotifyState] = useState<{ open: boolean, clients: Subscription[], newEmail?: string, newPassword?: string, platform: string, emailChanged?: boolean, passwordChanged?: boolean }>({ open: false, clients: [], platform: '' });
   const [welcomeSub, setWelcomeSub] = useState<Subscription | null>(null);
   const [replacementSub, setReplacementSub] = useState<Subscription | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -601,35 +602,46 @@ function IndexContent() {
       upsertContact(sub.clientName, sub.clientPhone || null, 'client');
     }
 
-    // Lógica para detectar cambio de contraseña
+    // Lógica para detectar cambio de credenciales
     let updatedSubs = [...subs];
-    const isPasswordChanged = editing && editing.accountPassword !== sub.accountPassword && sub.accountPassword && sub.accountEmail;
+    const isEmailChanged = !!(editing && editing.accountEmail !== sub.accountEmail && sub.accountEmail);
+    const isPasswordChanged = !!(editing && editing.accountPassword !== sub.accountPassword && sub.accountPassword && sub.accountEmail);
     
-    if (isPasswordChanged) {
-      // Find affected subscriptions (same platform and email, or same master account)
+    if (isEmailChanged || isPasswordChanged) {
+      // Find affected subscriptions (same platform and old email, or same master account)
       const affectedSubs = subs.filter(s => 
-        (s.platform === sub.platform && s.accountEmail.toLowerCase() === sub.accountEmail.toLowerCase()) ||
+        (s.platform === sub.platform && s.accountEmail.toLowerCase() === editing!.accountEmail.toLowerCase()) ||
         (sub.master_account_id && s.master_account_id === sub.master_account_id)
       );
 
       if (affectedSubs.length > 0) {
+        const updatePayload: any = {};
+        if (isEmailChanged) updatePayload.account_email = sub.accountEmail;
+        if (isPasswordChanged) updatePayload.account_password = sub.accountPassword;
+
         // Prepare to update them all
         for (const affected of affectedSubs) {
            if (affected.id !== sub.id) {
-             await supabase.from('subscriptions').update({ account_password: sub.accountPassword }).eq('id', affected.id);
+             await supabase.from('subscriptions').update(updatePayload).eq('id', affected.id);
            }
         }
         
-        // Si pertenece a una cuenta maestra, también actualizamos la contraseña en la tabla master_accounts
+        // Si pertenece a una cuenta maestra, también actualizamos las credenciales en la tabla master_accounts
         if (sub.master_account_id) {
-          await supabase.from('master_accounts').update({ account_password: sub.accountPassword }).eq('id', sub.master_account_id);
-          setMasterAccounts(prev => prev.map(ma => ma.id === sub.master_account_id ? { ...ma, account_password: sub.accountPassword! } : ma));
+          await supabase.from('master_accounts').update(updatePayload).eq('id', sub.master_account_id);
+          setMasterAccounts(prev => prev.map(ma => ma.id === sub.master_account_id ? { ...ma, ...updatePayload } : ma));
         }
 
         // Update local state
-        updatedSubs = updatedSubs.map(s => 
-          affectedSubs.some(a => a.id === s.id) ? { ...s, accountPassword: sub.accountPassword! } : s
-        );
+        updatedSubs = updatedSubs.map(s => {
+          if (affectedSubs.some(a => a.id === s.id)) {
+            const up = { ...s };
+            if (isEmailChanged) up.accountEmail = sub.accountEmail;
+            if (isPasswordChanged) up.accountPassword = sub.accountPassword!;
+            return up;
+          }
+          return s;
+        });
 
         // Include the current sub in the notification list if it's new/edited and has phone
         const allAffectedToNotify = updatedSubs.filter(s => affectedSubs.some(a => a.id === s.id) || s.id === sub.id);
@@ -640,8 +652,11 @@ function IndexContent() {
         setNotifyState({
           open: true,
           clients: uniqueToNotify,
-          newPassword: sub.accountPassword,
-          platform: sub.platform
+          newEmail: isEmailChanged ? sub.accountEmail : undefined,
+          newPassword: isPasswordChanged ? sub.accountPassword : undefined,
+          platform: sub.platform,
+          emailChanged: isEmailChanged,
+          passwordChanged: isPasswordChanged
         });
       }
     }
@@ -794,6 +809,13 @@ function IndexContent() {
                 <DollarSign className="h-3.5 w-3.5 inline mr-1" />
                 <span className="hidden sm:inline">Finanzas</span>
               </button>
+              <button
+                onClick={() => setActiveTab('store')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${activeTab === 'store' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                <Store className="h-3.5 w-3.5 inline mr-1" />
+                <span className="hidden sm:inline">Tienda</span>
+              </button>
             </div>
 
             <ThemeToggle />
@@ -910,20 +932,30 @@ function IndexContent() {
             onAccountsChange={setMasterAccounts}
             providerContacts={providerContacts}
             onProviderSaved={(name, phone) => upsertContact(name, phone, 'provider')}
-            onPasswordChanged={async (masterAccountId, newPassword, platform) => {
+            onCredentialsChanged={async (masterAccountId, newEmail, newPassword, platform, emailChanged, passwordChanged) => {
               // Buscar todos los clientes asociados a esta cuenta maestra
               const affectedSubs = subs.filter(s => s.master_account_id === masterAccountId);
               
               if (affectedSubs.length > 0) {
                 // Actualizar DB para todas las suscripciones
+                const updatePayload: any = {};
+                if (emailChanged) updatePayload.account_email = newEmail;
+                if (passwordChanged) updatePayload.account_password = newPassword;
+
                 for (const affected of affectedSubs) {
-                  await supabase.from('subscriptions').update({ account_password: newPassword }).eq('id', affected.id);
+                  await supabase.from('subscriptions').update(updatePayload).eq('id', affected.id);
                 }
                 
                 // Actualizar estado local
-                setSubs(prev => prev.map(s => 
-                  s.master_account_id === masterAccountId ? { ...s, accountPassword: newPassword } : s
-                ));
+                setSubs(prev => prev.map(s => {
+                  if (s.master_account_id === masterAccountId) {
+                    const up = { ...s };
+                    if (emailChanged) up.accountEmail = newEmail;
+                    if (passwordChanged) up.accountPassword = newPassword;
+                    return up;
+                  }
+                  return s;
+                }));
                 
                 // Remover duplicados
                 const uniqueToNotify = Array.from(new Map(affectedSubs.map(item => [item.id, item])).values());
@@ -931,13 +963,16 @@ function IndexContent() {
                 setNotifyState({
                   open: true,
                   clients: uniqueToNotify,
-                  newPassword,
-                  platform
+                  newEmail: emailChanged ? newEmail : undefined,
+                  newPassword: passwordChanged ? newPassword : undefined,
+                  platform,
+                  emailChanged,
+                  passwordChanged
                 });
               }
             }}
           />
-        ) : (
+        ) : activeTab === 'finance' ? (
           <FinanceSection 
             subscriptions={subs} 
             masterAccounts={masterAccounts}
@@ -948,7 +983,9 @@ function IndexContent() {
               }
             }} 
           />
-        )}
+        ) : activeTab === 'store' ? (
+          <StorefrontAdmin dynamicPlatforms={dynamicPlatforms} pricingConfig={pricingConfig} />
+        ) : null}
       </main>
 
       {/* ── FAB Mobile ── */}
@@ -994,20 +1031,25 @@ function IndexContent() {
         open={notifyState.open}
         onClose={() => setNotifyState(prev => ({ ...prev, open: false }))}
         clients={notifyState.clients}
+        newEmail={notifyState.newEmail}
         newPassword={notifyState.newPassword}
         platform={notifyState.platform}
+        emailChanged={notifyState.emailChanged}
+        passwordChanged={notifyState.passwordChanged}
       />
 
       <WelcomeWhatsAppDialog
         open={!!welcomeSub}
         onClose={() => setWelcomeSub(null)}
         subscription={welcomeSub}
+        masterAccounts={masterAccounts}
       />
 
       <ReplacementWhatsAppDialog
         open={!!replacementSub}
         onClose={() => setReplacementSub(null)}
         subscription={replacementSub}
+        masterAccounts={masterAccounts}
       />
 
       <InstallPWA />

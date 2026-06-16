@@ -8,11 +8,14 @@ interface Props {
   open: boolean;
   onClose: () => void;
   clients: Subscription[];
-  newPassword: string;
+  newEmail?: string;
+  newPassword?: string;
   platform: string;
+  emailChanged?: boolean;
+  passwordChanged?: boolean;
 }
 
-export default function PasswordNotifierDialog({ open, onClose, clients, newPassword, platform }: Props) {
+export default function PasswordNotifierDialog({ open, onClose, clients, newEmail, newPassword, platform, emailChanged, passwordChanged }: Props) {
   const [notified, setNotified] = useState<Set<string>>(new Set());
 
   const handleSendWhatsApp = (client: Subscription) => {
@@ -27,11 +30,17 @@ export default function PasswordNotifierDialog({ open, onClose, clients, newPass
     cutoffDate.setDate(cutoffDate.getDate() + 30);
     const formatES = (d: Date) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
 
+    const reasonText = (emailChanged && passwordChanged) 
+      ? 'el correo y la contraseña'
+      : emailChanged 
+        ? 'el correo' 
+        : 'la contraseña';
+
     const lines = [
-      `Hola, ${client.clientName} tu contraseña de *${platform}* ha sido actualizada por motivos de seguridad o mantenimiento.`,
+      `Hola, ${client.clientName} ${reasonText} de *${platform}* se ha actualizado por motivos de seguridad o mantenimiento.`,
       '',
-      `\uD83D\uDCE7 Correo: ${client.accountEmail}`,
-      `\uD83D\uDD10 *Nueva contraseña:*: ${newPassword}`,
+      `\uD83D\uDCE7 Correo: ${emailChanged ? newEmail : client.accountEmail}`,
+      `\uD83D\uDD10 ${passwordChanged ? '*Nueva contraseña:*' : 'Contraseña'}: ${passwordChanged ? newPassword : client.accountPassword}`,
       `\uD83D\uDC64 Perfil: ${client.accountName || 'N/A'}`,
       `\uD83D\uDD22 PIN: ${client.profilePin || 'N/A'}`,
       '',
@@ -53,10 +62,10 @@ export default function PasswordNotifierDialog({ open, onClose, clients, newPass
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MessageCircle className="h-5 w-5 text-green-500" />
-            Notificar cambio de contraseña
+            Notificar cambio de credenciales
           </DialogTitle>
           <DialogDescription>
-            La contraseña se ha actualizado para {clients.length} perfil{clients.length > 1 ? 'es' : ''} que comparten esta cuenta. ¿Deseas enviarles la nueva contraseña por WhatsApp?
+            Las credenciales se han actualizado para {clients.length} perfil{clients.length > 1 ? 'es' : ''} que comparten esta cuenta. ¿Deseas enviarles la actualización por WhatsApp?
           </DialogDescription>
         </DialogHeader>
 

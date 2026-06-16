@@ -6,10 +6,13 @@ import { MessageCircle, Send, Copy, Check, RefreshCw } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
 
+import { MasterAccount } from '@/types/masterAccount';
+
 interface Props {
   open: boolean;
   onClose: () => void;
   subscription: Subscription | null;
+  masterAccounts?: MasterAccount[];
 }
 
 function formatDateES(dateStr: string): string {
@@ -20,7 +23,7 @@ function formatDateES(dateStr: string): string {
   return `${day}/${month}/${year}`;
 }
 
-export default function ReplacementWhatsAppDialog({ open, onClose, subscription }: Props) {
+export default function ReplacementWhatsAppDialog({ open, onClose, subscription, masterAccounts = [] }: Props) {
   const [copied, setCopied] = useState(false);
 
   const message = useMemo(() => {
@@ -31,13 +34,40 @@ export default function ReplacementWhatsAppDialog({ open, onClose, subscription 
     cutoffDate.setDate(cutoffDate.getDate() + 30);
     const cutoffStr = `${cutoffDate.getDate().toString().padStart(2, '0')}/${(cutoffDate.getMonth() + 1).toString().padStart(2, '0')}/${cutoffDate.getFullYear()}`;
 
+    const isFullAccount = (subscription.profiles_sold || 1) > 1;
+    const ma = masterAccounts.find(m => m.id === subscription.master_account_id);
+    let customProfilesList = '';
+    if (ma && ma.profiles_config && Array.isArray(ma.profiles_config)) {
+      customProfilesList = ma.profiles_config
+        .map((p: any, i: number) => `- Perfil ${i + 1}: ${p.name || ''} (PIN: ${p.pin || 'N/A'})`)
+        .join('\n');
+    }
+
+    if (isFullAccount) {
+      const lines = [
+        `\uD83D\uDD04 *CUENTA DE REEMPLAZO DE ${subscription.platform.toUpperCase()}*`,
+        '',
+        `Hola, ${subscription.clientName} En garantia de su servicio y por dificultades tecnicas, le entregamos nuevos datos de acceso`,
+        '',
+        `\uD83D\uDCE7 *Correo:* ${subscription.accountEmail}`,
+        `\uD83D\uDD11 *Contrase\u00F1a:* ${subscription.accountPassword}`,
+        `\uD83D\uDC64 *Perfil:* Cuenta Completa`,
+        '',
+        `\uD83D\uDCC6 *Fecha de inicio:* ${formatDateES(subscription.purchaseDate)}`,
+        `\u23F3 *Fecha de corte:* ${cutoffStr}`,
+        '',
+        customProfilesList ? `Cuenta completa con ${ma?.total_profiles} perfiles:\n${customProfilesList}` : (subscription.notes ? `\uD83D\uDCDD ${subscription.notes}` : '')
+      ];
+      return lines.filter(line => line !== null && line !== undefined).join('\n');
+    }
+
     const lines = [
-      `\uD83D\uDD02 *CUENTA DE REEMPLAZO DE ${subscription.platform.toUpperCase()}*`,
+      `\uD83D\uDD04 *CUENTA DE REEMPLAZO DE ${subscription.platform.toUpperCase()}*`,
       '',
       `Hola, ${subscription.clientName} En garantia de su servicio y por dificultades tecnicas, le entregamos nuevos datos de acceso`,
       '',
       `\uD83D\uDCE7 *Correo:* ${subscription.accountEmail}`,
-      `\uD83D\uDD10 *Contrase\u00F1a:* ${subscription.accountPassword}`,
+      `\uD83D\uDD11 *Contrase\u00F1a:* ${subscription.accountPassword}`,
       `\uD83D\uDC64 *Perfil:* ${subscription.accountName || 'N/A'}`,
       `\uD83D\uDD22 *Pin:* ${subscription.profilePin || 'N/A'}`,
       '',
@@ -46,7 +76,7 @@ export default function ReplacementWhatsAppDialog({ open, onClose, subscription 
     ];
 
     return lines.join('\n');
-  }, [subscription]);
+  }, [subscription, masterAccounts]);
 
   const handleSendWhatsApp = () => {
     if (!subscription?.clientPhone) {

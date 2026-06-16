@@ -20,12 +20,12 @@ interface Props {
   subscriptions: Subscription[];
   dynamicPlatforms: string[];
   onAccountsChange: (accounts: MasterAccount[]) => void;
-  onPasswordChanged?: (masterAccountId: string, newPassword: string, platform: string) => void;
+  onCredentialsChanged?: (masterAccountId: string, newEmail: string, newPassword: string, platform: string, emailChanged: boolean, passwordChanged: boolean) => void;
   providerContacts?: Contact[];
   onProviderSaved?: (name: string, phone: string | null) => void;
 }
 
-export default function AccountsSection({ accounts, subscriptions, dynamicPlatforms, onAccountsChange, onPasswordChanged, providerContacts = [], onProviderSaved }: Props) {
+export default function AccountsSection({ accounts, subscriptions, dynamicPlatforms, onAccountsChange, onCredentialsChanged, providerContacts = [], onProviderSaved }: Props) {
   const { user } = useAuth();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<MasterAccount | null>(null);
@@ -39,8 +39,36 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
   const [showProviderSuggestions, setShowProviderSuggestions] = useState(false);
   const providerInputRef = useRef<HTMLInputElement>(null);
 
+  // Helper: Sincronizar perfiles
+  const syncProfilesConfig = (total: number, currentConfigs: { name: string; pin: string }[] = []) => {
+    const newConfigs = [...currentConfigs];
+    if (newConfigs.length < total) {
+      for (let i = newConfigs.length; i < total; i++) {
+        newConfigs.push({
+          name: `Perfil ${i + 1}`,
+          pin: String(i + 1).padStart(4, '0')
+        });
+      }
+    } else if (newConfigs.length > total) {
+      newConfigs.splice(total);
+    }
+    return newConfigs;
+  };
+
   // Form state
-  const emptyForm = { platform: dynamicPlatforms[0] || 'Netflix', account_email: '', account_password: '', total_profiles: 4, purchase_price: 0, notes: '', purchase_date: new Date().toISOString().split('T')[0], supplier_phone: '', supplier_name: '', duration_days: 30 };
+  const emptyForm = { 
+    platform: dynamicPlatforms[0] || 'Netflix', 
+    account_email: '', 
+    account_password: '', 
+    total_profiles: 4, 
+    purchase_price: 0, 
+    notes: '', 
+    purchase_date: new Date().toISOString().split('T')[0], 
+    supplier_phone: '', 
+    supplier_name: '', 
+    duration_days: 30,
+    profiles_config: [] as { name: string; pin: string }[]
+  };
   const [form, setForm] = useState(emptyForm);
 
   const computeCutDate = (purchaseDate: string, durationDays: number): string => {
@@ -137,6 +165,9 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
   const handleOpenForm = (account?: MasterAccount) => {
     if (account) {
       setEditing(account);
+      const currentConfigs = account.profiles_config || [];
+      const total = account.total_profiles;
+      const syncedConfigs = syncProfilesConfig(total, currentConfigs);
       setForm({
         platform: account.platform,
         account_email: account.account_email,
@@ -148,10 +179,15 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
         supplier_phone: account.supplier_phone || '',
         supplier_name: account.supplier_name || '',
         duration_days: account.duration_days || 30,
+        profiles_config: syncedConfigs,
       });
     } else {
       setEditing(null);
-      setForm(emptyForm);
+      const defaultTotal = emptyForm.total_profiles;
+      setForm({
+        ...emptyForm,
+        profiles_config: syncProfilesConfig(defaultTotal),
+      });
     }
     setFormOpen(true);
   };
@@ -176,6 +212,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
         supplier_name: form.supplier_name || null,
         duration_days: form.duration_days,
         notes: form.notes,
+        profiles_config: form.profiles_config,
       }).eq('id', editing.id);
 
       if (error) return toast.error('Error al actualizar: ' + error.message);
@@ -187,9 +224,12 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
         onProviderSaved(form.supplier_name, form.supplier_phone || null);
       }
 
-      // Si la contraseña cambió, invocar callback para notificar clientes
-      if (editing.account_password !== form.account_password && onPasswordChanged) {
-        onPasswordChanged(editing.id, form.account_password, form.platform);
+      // Si correo o contraseña cambiaron, invocar callback para notificar clientes
+      const emailChanged = editing.account_email !== form.account_email;
+      const passwordChanged = editing.account_password !== form.account_password;
+      
+      if ((emailChanged || passwordChanged) && onCredentialsChanged) {
+        onCredentialsChanged(editing.id, form.account_email, form.account_password, form.platform, emailChanged, passwordChanged);
       }
     } else {
       // Insert
@@ -205,6 +245,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
         supplier_name: form.supplier_name || null,
         duration_days: form.duration_days,
         notes: form.notes,
+        profiles_config: form.profiles_config,
       }).select().single();
 
       if (error) return toast.error('Error al crear: ' + error.message);
@@ -467,6 +508,44 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
                   </div>
                 </div>
 
+                {/* Custom Profiles list */}
+                {account.profiles_config && Array.isArray(account.profiles_config) && account.profiles_config.length > 0 && (
+                  <div className="border-t pt-2 space-y-1">
+                    <p className="text-[9px] font-semibold text-muted-foreground flex items-center gap-1">
+                      <Users className="h-3 w-3" /> Estado de Perfiles:
+                    </p>
+                    <div className="grid grid-cols-2 gap-1.5 max-h-[120px] overflow-y-auto pr-0.5">
+                      {account.profiles_config.map((prof: any, idx: number) => {
+                        const matchingSub = subscriptions.find(s => 
+                          (s as any).master_account_id === account.id && 
+                          String(s.profilePin) === String(prof.pin)
+                        );
+                        const isSold = !!matchingSub;
+                        return (
+                          <div 
+                            key={idx} 
+                            className={`text-[9px] px-2 py-1 rounded border flex flex-col justify-between ${
+                              isSold 
+                                ? 'bg-red-500/[0.03] border-red-500/10 text-muted-foreground' 
+                                : 'bg-emerald-500/[0.03] border-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                            }`}
+                          >
+                            <div className="flex justify-between items-center gap-1">
+                              <span className="font-semibold truncate max-w-[70px]" title={prof.name}>
+                                {prof.name || `Perfil ${idx + 1}`}
+                              </span>
+                              <span className="font-mono text-muted-foreground/80 shrink-0">🔑{prof.pin || 'S/N'}</span>
+                            </div>
+                            <span className="text-[8px] text-muted-foreground/80 mt-0.5 truncate">
+                              {isSold ? `👤 ${matchingSub.clientName}` : 'Disponible'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Financial info */}
                 <div className="flex justify-between items-center text-[10px] border-t pt-2 pb-1">
                   <span className="text-muted-foreground flex items-center gap-1"><DollarSign className="h-3 w-3" /> Costo: <span className="text-foreground font-semibold">{formatCOP(account.purchase_price)}</span></span>
@@ -563,7 +642,14 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Perfiles totales</Label>
-                <Input type="number" min={1} max={10} value={form.total_profiles} onChange={e => setForm(p => ({ ...p, total_profiles: parseInt(e.target.value) || 1 }))} />
+                <Input type="number" min={1} max={10} value={form.total_profiles} onChange={e => {
+                  const val = parseInt(e.target.value) || 1;
+                  setForm(p => ({ 
+                    ...p, 
+                    total_profiles: val,
+                    profiles_config: syncProfilesConfig(val, p.profiles_config || [])
+                  }));
+                }} />
               </div>
             </div>
 
@@ -575,6 +661,57 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Contraseña</Label>
                 <Input value={form.account_password} onChange={e => setForm(p => ({ ...p, account_password: e.target.value }))} placeholder="Contraseña de la cuenta" />
+              </div>
+            </div>
+
+            {/* Custom Profiles list */}
+            <div className="space-y-3 p-3 bg-muted/40 rounded-xl border border-border">
+              <Label className="text-xs font-semibold text-foreground flex items-center gap-1">
+                <Users className="h-4 w-4 text-primary" /> Personalización de Perfiles
+              </Label>
+              <p className="text-[10px] text-muted-foreground">
+                Configura el nombre y el PIN de cada perfil. El sistema de la tienda usará estos datos exactos al momento de vender.
+              </p>
+              
+              <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                {form.profiles_config?.map((prof, i) => (
+                  <div key={i} className="flex gap-2 items-center bg-card border rounded-lg p-2">
+                    <span className="text-[10px] font-bold text-muted-foreground w-16">
+                      Perfil {i + 1}
+                    </span>
+                    <div className="flex-1">
+                      <Input
+                        className="h-7 text-xs"
+                        placeholder="Nombre"
+                        value={prof.name}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setForm(p => {
+                            const configs = [...(p.profiles_config || [])];
+                            configs[i] = { ...configs[i], name: val };
+                            return { ...p, profiles_config: configs };
+                          });
+                        }}
+                      />
+                    </div>
+                    <div className="w-24">
+                      <Input
+                        className="h-7 text-xs font-mono"
+                        placeholder="PIN"
+                        maxLength={6}
+                        value={prof.pin}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setForm(p => {
+                            const configs = [...(p.profiles_config || [])];
+                            configs[i] = { ...configs[i], pin: val };
+                            return { ...p, profiles_config: configs };
+                          });
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 

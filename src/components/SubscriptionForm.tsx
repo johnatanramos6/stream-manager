@@ -142,10 +142,28 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
     setSelectedMasterAccountId(accountId);
     const ma = masterAccounts.find(m => m.id === accountId);
     if (ma) {
+      const assignedCount = allSubscriptions
+        .filter(s => (s as any).master_account_id === ma.id)
+        .reduce((sum, s) => sum + ((s as any).profiles_sold || 1), 0);
+      
+      const profileIndex = Math.max(0, Math.min(assignedCount, ma.total_profiles - 1));
+      let nextPin = undefined;
+      let nextName = '';
+      
+      if (ma.profiles_config && Array.isArray(ma.profiles_config)) {
+        const config = ma.profiles_config[profileIndex];
+        if (config) {
+          nextPin = config.pin;
+          nextName = config.name || '';
+        }
+      }
+
       setForm(prev => ({
         ...prev,
         accountEmail: ma.account_email,
         accountPassword: ma.account_password,
+        profilePin: nextPin !== undefined ? nextPin : (prev.profilePin || String(profileIndex + 1).padStart(4, '0')),
+        accountName: nextName ? `Perfil: ${nextName}` : prev.accountName,
       }));
     }
   };

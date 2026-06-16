@@ -12,6 +12,7 @@ export interface MasterAccount {
   supplier_phone?: string; // Teléfono/WhatsApp del proveedor
   supplier_name?: string; // Nombre del proveedor
   duration_days?: number; // Duración en días
+  profiles_config?: { name: string; pin: string }[];
   // Calculated (not from DB)
   assigned_profiles?: number;
   available_profiles?: number;
