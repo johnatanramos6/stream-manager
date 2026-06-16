@@ -604,8 +604,9 @@ function IndexContent() {
 
     // Lógica para detectar cambio de credenciales
     let updatedSubs = [...subs];
-    const isEmailChanged = !!(editing && editing.accountEmail !== sub.accountEmail && sub.accountEmail);
-    const isPasswordChanged = !!(editing && editing.accountPassword !== sub.accountPassword && sub.accountPassword && sub.accountEmail);
+    const isMasterAccountChanged = !!(editing && editing.master_account_id !== sub.master_account_id);
+    const isEmailChanged = !isMasterAccountChanged && !!(editing && editing.accountEmail !== sub.accountEmail && sub.accountEmail);
+    const isPasswordChanged = !isMasterAccountChanged && !!(editing && editing.accountPassword !== sub.accountPassword && sub.accountPassword && sub.accountEmail);
     
     if (isEmailChanged || isPasswordChanged) {
       // Find affected subscriptions (same platform and old email, or same master account)
