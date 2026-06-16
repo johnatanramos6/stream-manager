@@ -52,38 +52,72 @@ export function useContacts(userId: string | undefined) {
 
     try {
       if (existing) {
-        // Solo actualizar si el teléfono cambió y el nuevo no está vacío
+        // Optimistic update
         if (trimmedPhone && trimmedPhone !== existing.phone) {
-          const { error } = await supabase
+          setContacts(prev => prev.map(c =>
+            c.id === existing.id ? { ...c, phone: trimmedPhone, updated_at: new Date().toISOString() } : c
+          ));
+          await supabase
             .from('contacts')
             .update({ phone: trimmedPhone, updated_at: new Date().toISOString() })
             .eq('id', existing.id);
-
-          if (!error) {
-            setContacts(prev => prev.map(c =>
-              c.id === existing.id ? { ...c, phone: trimmedPhone, updated_at: new Date().toISOString() } : c
-            ));
-          }
         }
       } else {
-        // Insertar nuevo contacto
-        const { data, error } = await supabase
-          .from('contacts')
-          .upsert({
-            vendor_id: userId,
-            name: trimmedName,
-            phone: trimmedPhone,
-            type,
-          }, { onConflict: 'vendor_id,name,type' })
-          .select()
-          .single();
+        // Optimistic insert con ID temporal
+        const tempId = crypto.randomUUID();
+        const newContact: Contact = {
+          id: tempId,
+          vendor_id: userId,
+          name: trimmedName,
+          phone: trimmedPhone,
+          type,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        
+        setContacts(prev => [...prev, newContact].sort((a, b) => a.name.localeCompare(b.name)));
 
-        if (!error && data) {
-          setContacts(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+        // Intentar buscar si ya existe en la BD por si acaso
+        const { data: searchData } = await supabase
+          .from('contacts')
+          .select('id')
+          .eq('vendor_id', userId)
+          .eq('name', trimmedName)
+          .eq('type', type)
+          .maybeSingle();
+
+        if (searchData) {
+          // Si existe, solo actualizamos el telfono
+          await supabase
+            .from('contacts')
+            .update({ phone: trimmedPhone, updated_at: new Date().toISOString() })
+            .eq('id', searchData.id);
+            
+          // Reemplazar el ID temporal por el real
+          setContacts(prev => prev.map(c => c.id === tempId ? { ...c, id: searchData.id } : c));
+        } else {
+          // Insertar nuevo contacto real
+          const { data, error } = await supabase
+            .from('contacts')
+            .insert({
+              vendor_id: userId,
+              name: trimmedName,
+              phone: trimmedPhone,
+              type,
+            })
+            .select()
+            .single();
+
+          if (!error && data) {
+            // Reemplazar el temporal por el real de la BD
+            setContacts(prev => prev.map(c => c.id === tempId ? data : c));
+          } else {
+             console.error("Error guardando contacto:", error);
+          }
         }
       }
-    } catch {
-      // Silencioso - el autocompletado es una mejora, no debe bloquear
+    } catch (err) {
+      console.error("Error inesperado en upsertContact:", err);
     }
   }, [userId, contacts]);
 
