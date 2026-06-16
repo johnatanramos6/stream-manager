@@ -6,9 +6,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { DollarSign, TrendingUp, TrendingDown, Users, Monitor, Save, AlertCircle, Plus, X, ChevronLeft, ChevronRight, CalendarDays, Loader2 } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Users, Monitor, Save, AlertCircle, Plus, X, ChevronLeft, ChevronRight, CalendarDays, Loader2, Calendar, Eye, EyeOff } from 'lucide-react';
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
 import { MasterAccount } from '@/types/masterAccount';
+import { calculateCurrentFinancialStats, calculateMonthlyFinancialSnapshots, FINANCE_MONTH_FULL, FINANCE_MONTH_NAMES } from '@/lib/finance';
 
 interface Props {
   subscriptions: Subscription[];
@@ -40,8 +41,261 @@ const getPlatformBrandColor = (name: string) => {
   return fallbacks[Math.abs(hash) % fallbacks.length];
 };
 
-const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-const MONTH_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+// ── Helper para obtener logos de Wikimedia/locales ──
+export function getPlatformLogoDetails(platform: string): { logoUrl?: string; bgClass?: string; emoji?: string } | null {
+  const name = platform.toLowerCase().trim();
+  
+  if (name.includes('netflix')) {
+    return { logoUrl: 'https://cdn.simpleicons.org/netflix/E50914', bgClass: 'bg-black p-1.5', emoji: '🎬' };
+  }
+  if (name.includes('amazon') || name.includes('prime')) {
+    return { logoUrl: './primevideo-logo.png', bgClass: 'bg-white p-0.5', emoji: '📦' };
+  }
+  if (name.includes('claro')) {
+    return { logoUrl: 'https://cdn.simpleicons.org/claro/EF3829', bgClass: 'bg-white p-1.5', emoji: '🔴' };
+  }
+  if (name.includes('paramount')) {
+    return { logoUrl: 'https://cdn.simpleicons.org/paramount/ffffff', bgClass: 'bg-[#0064FF] p-0.5', emoji: '🏔️' };
+  }
+  if (name.includes('max') || name.includes('hbo')) {
+    return { logoUrl: 'https://cdn.simpleicons.org/hbo/ffffff', bgClass: 'bg-[#002BE7] p-1.5', emoji: '🟣' };
+  }
+  if (name.includes('disney') || name.includes('star')) {
+    return { logoUrl: './disneyplus-logo.png', bgClass: 'bg-[#0b133a] p-0.5', emoji: '🏰' };
+  }
+  if (name.includes('crunchyroll') || name.includes('crunchy')) {
+    return { logoUrl: 'https://cdn.simpleicons.org/crunchyroll/F47521', bgClass: 'bg-zinc-950 p-1', emoji: '🦊' };
+  }
+  if (name.includes('spotify')) {
+    return { logoUrl: 'https://cdn.simpleicons.org/spotify/1DB954', bgClass: 'bg-black p-1', emoji: '🎵' };
+  }
+  if (name.includes('plex')) {
+    return { logoUrl: 'https://cdn.simpleicons.org/plex/E5A93B', bgClass: 'bg-[#1f2326] p-1', emoji: '🟡' };
+  }
+  if (name.includes('flujo')) {
+    return { logoUrl: './flujo-logo.jpg', bgClass: 'bg-white p-1', emoji: '📺' };
+  }
+  if (name.includes('iptv') || name.includes('smarters')) {
+    return { logoUrl: './iptv-logo.jpg', bgClass: 'bg-zinc-950 p-0.5', emoji: '📺' };
+  }
+  if (name.includes('vix')) {
+    return { logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/e/e0/ViX_logo.svg', bgClass: 'bg-white p-1', emoji: '🧡' };
+  }
+  if (name.includes('canva')) {
+    return { logoUrl: 'https://cdn.simpleicons.org/canva/00C4CC', bgClass: 'bg-white p-1', emoji: '🎨' };
+  }
+  if (name.includes('capcut')) {
+    return { logoUrl: './capcut-logo.jpg', bgClass: 'bg-white p-0.5', emoji: '🎬' };
+  }
+  if (name.includes('microsoft') || name.includes('office') || name.includes('365') || name.includes('m365')) {
+    return { logoUrl: 'https://cdn.simpleicons.org/microsoftoffice/D83B01', bgClass: 'bg-white p-1', emoji: '💼' };
+  }
+  if (name.includes('chatgpt') || name.includes('openai') || name.includes('gpt')) {
+    return { logoUrl: './chatgpt-logo.jpg', bgClass: 'bg-zinc-900 p-0.5', emoji: '🤖' };
+  }
+  if (name.includes('gemini') || name.includes('google ai') || name.includes('googleai')) {
+    return { logoUrl: './gemini-logo.jpg', bgClass: 'bg-black p-0.5', emoji: '🧠' };
+  }
+  if (name.includes('apple')) {
+    return { logoUrl: 'https://cdn.simpleicons.org/apple/ffffff', bgClass: 'bg-black p-1.5', emoji: '🍎' };
+  }
+  if (name.includes('youtube')) {
+    return { logoUrl: 'https://cdn.simpleicons.org/youtube/FF0000', bgClass: 'bg-white p-1', emoji: '🔴' };
+  }
+  return null;
+}
+
+// ── Custom Tick para el eje X que dibuja logo y nombre ──
+const CustomXAxisTick = (props: any) => {
+  const { x, y, payload, logoErrors, setLogoErrors } = props;
+  const platformName = payload.value;
+  const rawName = platformName.replace('…', '');
+  const details = getPlatformLogoDetails(rawName);
+  const color = getPlatformBrandColor(rawName);
+  const hasError = logoErrors && logoErrors[rawName];
+  const showImage = details?.logoUrl && !hasError;
+  
+  return (
+    <g transform={`translate(${x},${y})`}>
+      {showImage ? (
+        <g>
+          {/* Círculo fondo blanco/negro según marca */}
+          <circle cx={0} cy={14} r={11} fill={details.bgClass?.includes('bg-black') ? '#000000' : '#ffffff'} stroke="rgba(255,255,255,0.15)" strokeWidth={1} />
+          {/* Logo SVG/Imagen */}
+          <image
+            href={details.logoUrl}
+            x={-7.5}
+            y={6.5}
+            width={15}
+            height={15}
+            onError={() => {
+              if (setLogoErrors) {
+                setLogoErrors((prev: any) => ({ ...prev, [rawName]: true }));
+              }
+            }}
+          />
+        </g>
+      ) : (
+        <g>
+          {/* Fallback de color de marca con el Emoji o inicial */}
+          <circle cx={0} cy={14} r={11} fill={color} />
+          <text
+            x={0}
+            y={17}
+            textAnchor="middle"
+            fill="#ffffff"
+            fontSize={9}
+            fontWeight="bold"
+          >
+            {details?.emoji || (rawName.includes('IPTV') ? '📺' : rawName.charAt(0).toUpperCase())}
+          </text>
+        </g>
+      )}
+      {/* Nombre de la plataforma */}
+      <text
+        x={0}
+        y={38}
+        textAnchor="middle"
+        fill="hsl(var(--muted-foreground))"
+        fontSize={10}
+        fontWeight={500}
+      >
+        {platformName}
+      </text>
+    </g>
+  );
+};
+
+// ── Custom Tooltip con contraste 100% perfecto ──
+const CustomChartTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    const isScaled = 'realCosto' in data;
+    const realCosto = isScaled ? data.realCosto : data.Costo;
+    const realGanancia = isScaled ? data.realGanancia : data.Ganancia;
+    const realIngreso = isScaled ? data.realIngreso : (data.Costo + data.Ganancia);
+    const platformName = data.name || '';
+    
+    return (
+      <div className="bg-zinc-950 text-zinc-100 border border-zinc-800 rounded-xl p-3.5 shadow-2xl space-y-2 min-w-[200px] text-xs">
+        <p className="font-bold border-b border-zinc-800 pb-1 text-sm flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: getPlatformBrandColor(platformName) }} />
+          {platformName}
+        </p>
+        <div className="space-y-1">
+          <div className="flex justify-between gap-4">
+            <span className="text-zinc-400 flex items-center gap-1">🔴 Costo base:</span>
+            <span className="font-semibold text-red-400">{formatCOP(realCosto)}</span>
+          </div>
+          <div className="flex justify-between gap-4">
+            <span className="text-zinc-400 flex items-center gap-1">🟢 Ganancia Neta:</span>
+            <span className="font-semibold text-emerald-400">{formatCOP(realGanancia)}</span>
+          </div>
+          <div className="flex justify-between gap-4 border-t border-zinc-800 pt-1 font-bold text-sm">
+            <span className="text-zinc-200">⚡ Ingreso Total:</span>
+            <span className="text-indigo-400">{formatCOP(realIngreso)}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+// ── Helper: ventas de un día específico (simple, sin prorrateo) ──
+interface DailySale {
+  clientName: string;
+  platform: string;
+  profiles: number;
+  income: number;
+  cost: number;
+  profit: number;
+}
+
+interface DailyPlatformSummary {
+  platform: string;
+  count: number;
+  profiles: number;
+  income: number;
+  cost: number;
+  profit: number;
+}
+
+interface DailyStatsResult {
+  sales: DailySale[];
+  platformSummary: DailyPlatformSummary[];
+  totalIncome: number;
+  totalCost: number;
+  totalProfit: number;
+  totalSales: number;
+  totalProfiles: number;
+}
+
+function calculateDailyStats(
+  subscriptions: Subscription[],
+  masterAccounts: MasterAccount[],
+  pricing: PlatformPricing[],
+  targetDate: Date
+): DailyStatsResult {
+  const pricingMap = new Map(pricing.map(p => [p.platform, p]));
+  const masterAccountsMap = new Map(masterAccounts.map(ma => [ma.id, ma]));
+  const dateStr = targetDate.toISOString().split('T')[0];
+
+  // Solo suscripciones vendidas/creadas ese día exacto
+  const soldThatDay = subscriptions.filter(sub => sub.purchaseDate === dateStr);
+
+  const sales: DailySale[] = [];
+  const platformMap = new Map<string, DailyPlatformSummary>();
+
+  soldThatDay.forEach(sub => {
+    const pricingConfig = pricingMap.get(sub.platform);
+    const profiles = Math.max(1, sub.profiles_sold || 1);
+
+    // Ingreso real: precio de venta override o (precio venta x perfiles)
+    const income = sub.salePriceOverride ?? ((pricingConfig?.salePrice || 0) * profiles);
+
+    // Costo real
+    let cost = 0;
+    if (sub.master_account_id) {
+      const ma = masterAccountsMap.get(sub.master_account_id);
+      if (ma && ma.total_profiles > 0) {
+        cost = (ma.purchase_price / ma.total_profiles) * profiles;
+      }
+    } else {
+      const costPrice = pricingConfig?.costPrice || 0;
+      const costType = pricingConfig?.costType || 'per_screen';
+      cost = costType === 'per_account' ? costPrice : costPrice * profiles;
+    }
+
+    const profit = income - cost;
+
+    sales.push({ clientName: sub.clientName, platform: sub.platform, profiles, income, cost, profit });
+
+    // Agrupar por plataforma
+    const existing = platformMap.get(sub.platform);
+    if (existing) {
+      existing.count++;
+      existing.profiles += profiles;
+      existing.income += income;
+      existing.cost += cost;
+      existing.profit += profit;
+    } else {
+      platformMap.set(sub.platform, { platform: sub.platform, count: 1, profiles, income, cost, profit });
+    }
+  });
+
+  const platformSummary = Array.from(platformMap.values()).sort((a, b) => b.income - a.income);
+
+  return {
+    sales,
+    platformSummary,
+    totalIncome: sales.reduce((a, s) => a + s.income, 0),
+    totalCost: sales.reduce((a, s) => a + s.cost, 0),
+    totalProfit: sales.reduce((a, s) => a + s.profit, 0),
+    totalSales: sales.length,
+    totalProfiles: sales.reduce((a, s) => a + s.profiles, 0),
+  };
+}
 
 export default function FinanceSection({ subscriptions, masterAccounts, onPricingSaved }: Props) {
   const { user } = useAuth();
@@ -49,6 +303,10 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
   const [editing, setEditing] = useState(false);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [isSaving, setIsSaving] = useState(false);
+  const [showDailyView, setShowDailyView] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [useOptimizedScale, setUseOptimizedScale] = useState(false);
+  const [logoErrors, setLogoErrors] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!user) return;
@@ -103,178 +361,65 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
   };
 
   const stats = useMemo(() => {
-    const pricingMap = new Map(pricing.map(p => [p.platform, p]));
-    const masterAccountsMap = new Map(masterAccounts.map(ma => [ma.id, ma]));
+    return calculateCurrentFinancialStats(subscriptions, masterAccounts, pricing);
+  }, [subscriptions, masterAccounts, pricing]);
 
-    const platformStatsMap = new Map<string, { accounts: number; clients: number; revenue: number; cost: number; profit: number; marginPercent: number }>();
-    const uniqueAccounts = new Set<string>();
+  const chartData = useMemo(() => {
+    return stats.platformStats.map(ps => ({
+      name: ps.platform.length > 12 ? ps.platform.substring(0, 10) + '…' : ps.platform,
+      Ganancia: ps.profit,
+      Costo: ps.cost,
+      Ingreso: ps.revenue,
+    }));
+  }, [stats.platformStats]);
 
-    subscriptions.forEach(sub => {
-      const p = pricingMap.get(sub.platform);
-      
-      // Calculate revenue
-      const salePrice = p ? p.salePrice : 0;
-      const durationMonths = Math.max(1, (sub.duration_days || 30) / 30);
-      const actualRevenue = (sub.salePriceOverride ?? (salePrice * (sub.profiles_sold || 1))) / durationMonths;
-
-      const ps = platformStatsMap.get(sub.platform) || { accounts: 0, clients: 0, revenue: 0, cost: 0, profit: 0, marginPercent: 0 };
-      ps.clients += (sub.profiles_sold || 1);
-      ps.revenue += actualRevenue;
-
-      // Only count cost if it's a MANUAL subscription
-      if (!sub.master_account_id) {
-        const key = sub.accountEmail ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}` : `ungrouped::${sub.id}`;
-        const isNewAccount = !uniqueAccounts.has(key);
-        if (isNewAccount) {
-          uniqueAccounts.add(key);
-          ps.accounts++;
-        }
-
-        const pConf = p || { costPrice: 0, salePrice: 0, costType: sub.platform === 'IPTV Premium' ? 'per_account' : 'per_screen' };
-        const cType = (pConf as any).costType || (sub.platform === 'IPTV Premium' ? 'per_account' : 'per_screen');
-        
-        let costForThisSub = 0;
-        if (cType === 'per_account') {
-          if (isNewAccount) costForThisSub = pConf.costPrice;
-        } else {
-          costForThisSub = pConf.costPrice * (sub.profiles_sold || 1);
-        }
-        ps.cost += costForThisSub / durationMonths;
+  const displayChartData = useMemo(() => {
+    if (!useOptimizedScale) {
+      return chartData;
+    }
+    const maxVal = Math.max(...chartData.map(d => d.Ingreso || 1));
+    return chartData.map(d => {
+      if (d.Ingreso <= 0) {
+        return {
+          ...d,
+          realCosto: d.Costo,
+          realGanancia: d.Ganancia,
+          realIngreso: d.Ingreso
+        };
       }
-
-      platformStatsMap.set(sub.platform, ps);
+      const factor = d.Ingreso / maxVal;
+      // Compresión no lineal usando exponente 0.45 para acercar visualmente las plataformas chicas a las grandes
+      const visualTotal = maxVal * Math.pow(factor, 0.45);
+      const costRatio = d.Costo / d.Ingreso;
+      const visualCosto = visualTotal * costRatio;
+      const visualGanancia = visualTotal - visualCosto;
+      return {
+        ...d,
+        Costo: visualCosto,
+        Ganancia: visualGanancia,
+        realCosto: d.Costo,
+        realGanancia: d.Ganancia,
+        realIngreso: d.Ingreso
+      };
     });
-
-    // 2. Add Costs and Accounts from Master Accounts
-    masterAccounts.forEach(ma => {
-      const ps = platformStatsMap.get(ma.platform) || { accounts: 0, clients: 0, revenue: 0, cost: 0, profit: 0, marginPercent: 0 };
-      ps.accounts++;
-      const durationMonths = Math.max(1, (ma.duration_days || 30) / 30);
-      ps.cost += ma.purchase_price / durationMonths;
-      platformStatsMap.set(ma.platform, ps);
-    });
-
-    let totalRevenue = 0;
-    let totalCost = 0;
-    const platformStats: { platform: string; accounts: number; clients: number; cost: number; revenue: number; profit: number; marginPercent: number }[] = [];
-
-    platformStatsMap.forEach((ps, platform) => {
-      ps.profit = ps.revenue - ps.cost;
-      ps.marginPercent = ps.revenue > 0 ? (ps.profit / ps.revenue) * 100 : 0;
-
-      totalCost += ps.cost;
-      totalRevenue += ps.revenue;
-
-      platformStats.push({ platform, ...ps });
-    });
-
-    platformStats.sort((a, b) => b.profit - a.profit);
-
-    // Pending collections
-    const pendingCount = subscriptions.filter(s => s.paymentStatus === 'debe' || s.paymentStatus === 'cobrar').length;
-    const pendingAmount = subscriptions
-      .filter(s => s.paymentStatus === 'debe' || s.paymentStatus === 'cobrar')
-      .reduce((acc, s) => {
-        const p = pricingMap.get(s.platform);
-        const durationMonths = Math.max(1, (s.duration_days || 30) / 30);
-        const actualPrice = (s.salePriceOverride ?? ((p?.salePrice || 0) * (s.profiles_sold || 1))) / durationMonths;
-        return acc + actualPrice;
-      }, 0);
-
-    const totalClientsSum = subscriptions.reduce((acc, sub) => acc + (sub.profiles_sold || 1), 0);
-
-    return { totalRevenue, totalCost, totalProfit: totalRevenue - totalCost, platformStats, totalClients: totalClientsSum, pendingCount, pendingAmount };
-  }, [subscriptions, pricing]);
-
-  const chartData = stats.platformStats.map(ps => ({
-    name: ps.platform.length > 12 ? ps.platform.substring(0, 10) + '…' : ps.platform,
-    Ganancia: ps.profit,
-    Costo: ps.cost,
-    Ingreso: ps.revenue,
-  }));
+  }, [chartData, useOptimizedScale]);
 
   // ── Datos mensuales para el gráfico de tendencia ──
   const currentMonthIdx = new Date().getMonth();
-  const isCurrentYear = selectedYear === new Date().getFullYear();
-  const lastRealMonth = isCurrentYear ? currentMonthIdx : 11;
-
   const monthlyData = useMemo(() => {
-    const pricingMap = new Map(pricing.map(p => [p.platform, p]));
-    const masterAccountsMap = new Map(masterAccounts.map(ma => [ma.id, ma]));
-    const months: { month: string; monthFull: string; Ingresos: number | null; Costos: number | null; Ganancia: number | null; IngresosProj: number | null; CostosProj: number | null; GananciaProj: number | null; clients: number; isFuture: boolean }[] = [];
-
-    for (let m = 0; m < 12; m++) {
-      const isFuture = isCurrentYear && m > currentMonthIdx;
-
-      const subsInMonth = subscriptions.filter(sub => {
-        const d = new Date(sub.purchaseDate + 'T12:00:00');
-        const subStart = new Date(d.getFullYear(), d.getMonth(), 1);
-        const targetMonth = new Date(selectedYear, m, 1);
-        return subStart <= targetMonth;
-      });
-
-      let revenue = 0;
-      let cost = 0;
-      const uniqueAccounts = new Set<string>();
-
-
-
-      const maInMonth = masterAccounts.filter(ma => {
-        const d = new Date((ma.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
-        const maStart = new Date(d.getFullYear(), d.getMonth(), 1);
-        const targetMonthDate = new Date(selectedYear, m, 1);
-        return maStart <= targetMonthDate;
-      });
-
-      subsInMonth.forEach(sub => {
-        const p = pricingMap.get(sub.platform);
-        const durationMonths = Math.max(1, (sub.duration_days || 30) / 30);
-        const salePrice = p ? p.salePrice : 0;
-        revenue += (sub.salePriceOverride ?? (salePrice * (sub.profiles_sold || 1))) / durationMonths;
-
-        if (!sub.master_account_id) {
-          const key = sub.accountEmail ? `${sub.platform}::${sub.accountEmail.trim().toLowerCase()}` : `ungrouped::${sub.id}`;
-          const isNewAccount = !uniqueAccounts.has(key);
-          if (isNewAccount) uniqueAccounts.add(key);
-
-          const cType = (p as any)?.costType || 'per_screen';
-          let costForThisSub = 0;
-          if (cType === 'per_account') {
-            if (isNewAccount) costForThisSub = p?.costPrice || 0;
-          } else {
-            costForThisSub = (p?.costPrice || 0) * (sub.profiles_sold || 1);
-          }
-          cost += costForThisSub / durationMonths;
-        }
-      });
-
-      maInMonth.forEach(ma => {
-        const durationMonths = Math.max(1, (ma.duration_days || 30) / 30);
-        cost += ma.purchase_price / durationMonths;
-      });
-
-      months.push({
-        month: MONTH_NAMES[m],
-        monthFull: MONTH_FULL[m],
-        Ingresos: !isFuture ? revenue : null,
-        Costos: !isFuture ? cost : null,
-        Ganancia: !isFuture ? revenue - cost : null,
-        IngresosProj: (m === lastRealMonth || isFuture) ? revenue : null,
-        CostosProj: (m === lastRealMonth || isFuture) ? cost : null,
-        GananciaProj: (m === lastRealMonth || isFuture) ? revenue - cost : null,
-        clients: subsInMonth.length,
-        isFuture
-      });
-    }
-    return months;
-  }, [subscriptions, pricing, selectedYear, currentMonthIdx, isCurrentYear, lastRealMonth]);
+    return calculateMonthlyFinancialSnapshots(subscriptions, masterAccounts, pricing, selectedYear);
+  }, [subscriptions, masterAccounts, pricing, selectedYear]);
 
   // Solo sumar meses reales (no futuros) para el total anual
   const realMonths = monthlyData.filter(m => !m.isFuture);
   const annualTotal = realMonths.reduce((acc, m) => acc + (m.Ingresos || 0), 0);
   const annualProfit = realMonths.reduce((acc, m) => acc + (m.Ganancia || 0), 0);
+  const annualCost = realMonths.reduce((acc, m) => acc + (m.Costos || 0), 0);
   const currentMonthRevenue = monthlyData[currentMonthIdx]?.Ingresos || 0;
+  const currentMonthProfit = monthlyData[currentMonthIdx]?.Ganancia || 0;
+  const currentMonthCost = monthlyData[currentMonthIdx]?.Costos || 0;
   const prevMonthRevenue = currentMonthIdx > 0 ? (monthlyData[currentMonthIdx - 1]?.Ingresos || 0) : 0;
+  const prevMonthProfit = currentMonthIdx > 0 ? (monthlyData[currentMonthIdx - 1]?.Ganancia || 0) : 0;
   const trendPercent = prevMonthRevenue > 0 ? ((currentMonthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100 : 0;
   const isGrowing = trendPercent >= 0;
 
@@ -287,6 +432,15 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
     });
     return Array.from(years).sort((a, b) => b - a);
   }, [subscriptions]);
+
+  // ── Daily stats ──
+  const dailyStats = useMemo(() => {
+    if (!showDailyView) return null;
+    return calculateDailyStats(subscriptions, masterAccounts, pricing, new Date(selectedDate + 'T12:00:00'));
+  }, [showDailyView, selectedDate, subscriptions, masterAccounts, pricing]);
+
+  const selectedDateObj = new Date(selectedDate + 'T12:00:00');
+  const dayLabel = selectedDateObj.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -324,6 +478,149 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
         </div>
       )}
 
+      {/* ── Vista Diaria Desplegable ── */}
+      <div className="bg-card rounded-xl border overflow-hidden animate-fade-in-up shadow-sm">
+        <button
+          onClick={() => setShowDailyView(p => !p)}
+          className="w-full p-4 flex items-center justify-between hover:bg-muted/10 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-primary" />
+            <h3 className="font-semibold text-sm sm:text-base">Finanzas por Día</h3>
+            <span className="text-xs text-muted-foreground ml-1">— Consulta las métricas de un día específico</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {showDailyView ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+          </div>
+        </button>
+
+        {showDailyView && (
+          <div className="border-t p-4 space-y-4">
+            {/* Date picker */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <label className="text-sm font-medium text-muted-foreground">Seleccionar fecha:</label>
+              <Input
+                type="date"
+                value={selectedDate}
+                onChange={e => setSelectedDate(e.target.value)}
+                className="w-auto"
+              />
+              <Button size="sm" variant="outline" onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}>
+                Hoy
+              </Button>
+            </div>
+
+            {/* Day label */}
+            <p className="text-xs text-muted-foreground capitalize">{dayLabel}</p>
+
+            {dailyStats && (
+              <>
+                {/* Resumen del día */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                  <div className="p-3 rounded-lg bg-primary/5 border border-primary/10 text-center">
+                    <p className="text-xl font-bold text-primary">{dailyStats.totalSales}</p>
+                    <p className="text-[10px] text-muted-foreground">Ventas realizadas</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/10 text-center">
+                    <p className="text-xl font-bold text-amber-500">{dailyStats.totalProfiles}</p>
+                    <p className="text-[10px] text-muted-foreground">Pantallas vendidas</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/10 text-center">
+                    <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{formatCOP(dailyStats.totalIncome)}</p>
+                    <p className="text-[10px] text-muted-foreground">Ingreso total del día</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-red-500/5 border border-red-500/10 text-center">
+                    <p className="text-xl font-bold text-red-500">{formatCOP(dailyStats.totalCost)}</p>
+                    <p className="text-[10px] text-muted-foreground">Costo total del día</p>
+                  </div>
+                  <div className={`p-3 rounded-lg text-center border col-span-2 sm:col-span-1 ${dailyStats.totalProfit >= 0 ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-red-500/5 border-red-500/10'}`}>
+                    <p className={`text-xl font-bold ${dailyStats.totalProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>{formatCOP(dailyStats.totalProfit)}</p>
+                    <p className="text-[10px] text-muted-foreground">Ganancia del día</p>
+                  </div>
+                </div>
+
+                {/* Sin ventas ese día */}
+                {dailyStats.totalSales === 0 && (
+                  <div className="text-center py-6 text-muted-foreground">
+                    <Calendar className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">No se registraron ventas este día</p>
+                  </div>
+                )}
+
+                {/* Resumen por plataforma */}
+                {dailyStats.platformSummary.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">📱 Plataformas vendidas</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {dailyStats.platformSummary.map(ps => (
+                        <div key={ps.platform} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/10 hover:bg-muted/20 transition-colors">
+                          <div className="w-1 h-10 rounded-full" style={{ backgroundColor: getPlatformBrandColor(ps.platform) }} />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{ps.platform}</p>
+                            <p className="text-[10px] text-muted-foreground">{ps.count} venta{ps.count > 1 ? 's' : ''} · {ps.profiles} pantalla{ps.profiles > 1 ? 's' : ''}</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{formatCOP(ps.income)}</p>
+                            <p className="text-[10px] text-muted-foreground">ingreso</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Detalle de cada venta */}
+                {dailyStats.sales.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">📋 Detalle de ventas</p>
+                    <div className="overflow-x-auto rounded-lg border">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-muted/50">
+                            <th className="text-left p-2.5 font-semibold text-xs">Cliente</th>
+                            <th className="text-left p-2.5 font-semibold text-xs">Plataforma</th>
+                            <th className="text-right p-2.5 font-semibold text-xs">Pantallas</th>
+                            <th className="text-right p-2.5 font-semibold text-xs">Ingreso</th>
+                            <th className="text-right p-2.5 font-semibold text-xs">Costo</th>
+                            <th className="text-right p-2.5 font-semibold text-xs">Ganancia</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dailyStats.sales.map((sale, idx) => (
+                            <tr key={idx} className="border-t hover:bg-muted/20 transition-colors">
+                              <td className="p-2.5 font-medium">{sale.clientName}</td>
+                              <td className="p-2.5">
+                                <span className="inline-flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: getPlatformBrandColor(sale.platform) }} />
+                                  {sale.platform}
+                                </span>
+                              </td>
+                              <td className="p-2.5 text-right">{sale.profiles}</td>
+                              <td className="p-2.5 text-right text-blue-600 dark:text-blue-400">{formatCOP(sale.income)}</td>
+                              <td className="p-2.5 text-right text-red-500">{formatCOP(sale.cost)}</td>
+                              <td className="p-2.5 text-right font-bold text-emerald-600 dark:text-emerald-400">{formatCOP(sale.profit)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t bg-muted/30 font-bold">
+                            <td className="p-2.5" colSpan={2}>Total</td>
+                            <td className="p-2.5 text-right">{dailyStats.totalProfiles}</td>
+                            <td className="p-2.5 text-right text-blue-600 dark:text-blue-400">{formatCOP(dailyStats.totalIncome)}</td>
+                            <td className="p-2.5 text-right text-red-500">{formatCOP(dailyStats.totalCost)}</td>
+                            <td className="p-2.5 text-right text-emerald-600 dark:text-emerald-400">{formatCOP(dailyStats.totalProfit)}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* ── Gráfico de Tendencia Mensual ── */}
       <div className="bg-card rounded-xl border overflow-hidden animate-fade-in-up shadow-sm">
         <div className="p-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-muted/10">
@@ -344,26 +641,56 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
           </div>
         </div>
 
-        {/* Tarjetas de resumen anual */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 border-b bg-muted/5">
-          <div className="text-center p-3 rounded-lg bg-primary/5 border border-primary/10">
-            <p className="text-lg sm:text-xl font-bold text-primary">{formatCOP(annualTotal)}</p>
-            <p className="text-[10px] text-muted-foreground">Facturado {selectedYear}</p>
+        {/* ── Resumen Anual Acumulado ── */}
+        <div className="p-4 border-b bg-muted/5">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+            📊 Acumulado del año {selectedYear} <span className="normal-case font-normal">(suma de todos los meses transcurridos)</span>
+          </p>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="text-center p-3 rounded-lg bg-primary/5 border border-primary/10">
+              <p className="text-lg sm:text-xl font-bold text-primary">{formatCOP(annualTotal)}</p>
+              <p className="text-[10px] text-muted-foreground">Total facturado</p>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-red-500/5 border border-red-500/10">
+              <p className="text-lg sm:text-xl font-bold text-red-500">{formatCOP(annualCost)}</p>
+              <p className="text-[10px] text-muted-foreground">Total costos</p>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
+              <p className="text-lg sm:text-xl font-bold text-emerald-600 dark:text-emerald-400">{formatCOP(annualProfit)}</p>
+              <p className="text-[10px] text-muted-foreground">Total ganancia neta</p>
+            </div>
           </div>
-          <div className="text-center p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
-            <p className="text-lg sm:text-xl font-bold text-emerald-600 dark:text-emerald-400">{formatCOP(annualProfit)}</p>
-            <p className="text-[10px] text-muted-foreground">Ganancia {selectedYear}</p>
-          </div>
-          <div className="text-center p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
-            <p className="text-lg sm:text-xl font-bold text-blue-600 dark:text-blue-400">{formatCOP(currentMonthRevenue)}</p>
-            <p className="text-[10px] text-muted-foreground">{MONTH_FULL[currentMonthIdx]} (actual)</p>
-          </div>
-          <div className={`text-center p-3 rounded-lg border ${isGrowing ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-red-500/5 border-red-500/10'}`}>
-            <p className={`text-lg sm:text-xl font-bold flex items-center justify-center gap-1 ${isGrowing ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
-              {isGrowing ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-              {prevMonthRevenue > 0 ? `${trendPercent > 0 ? '+' : ''}${trendPercent.toFixed(1)}%` : '—'}
-            </p>
-            <p className="text-[10px] text-muted-foreground">vs. {currentMonthIdx > 0 ? MONTH_FULL[currentMonthIdx - 1] : '—'}</p>
+        </div>
+
+        {/* ── Comparativa mes actual vs anterior ── */}
+        <div className="p-4 border-b bg-muted/5">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+            📅 Comparativa mensual
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="text-center p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
+              <p className="text-lg sm:text-xl font-bold text-blue-600 dark:text-blue-400">{formatCOP(currentMonthRevenue)}</p>
+              <p className="text-[10px] text-muted-foreground font-medium">Ingresos de {FINANCE_MONTH_FULL[currentMonthIdx]}</p>
+              <p className="text-[9px] text-muted-foreground/70 mt-0.5">Solo este mes</p>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
+              <p className="text-lg sm:text-xl font-bold text-emerald-600 dark:text-emerald-400">{formatCOP(currentMonthProfit)}</p>
+              <p className="text-[10px] text-muted-foreground font-medium">Ganancia de {FINANCE_MONTH_FULL[currentMonthIdx]}</p>
+              <p className="text-[9px] text-muted-foreground/70 mt-0.5">Solo este mes</p>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-muted/30 border">
+              <p className="text-lg sm:text-xl font-bold text-muted-foreground">{formatCOP(prevMonthRevenue)}</p>
+              <p className="text-[10px] text-muted-foreground font-medium">Ingresos de {currentMonthIdx > 0 ? FINANCE_MONTH_FULL[currentMonthIdx - 1] : '—'}</p>
+              <p className="text-[9px] text-muted-foreground/70 mt-0.5">Mes anterior</p>
+            </div>
+            <div className={`text-center p-3 rounded-lg border ${isGrowing ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-red-500/5 border-red-500/10'}`}>
+              <p className={`text-lg sm:text-xl font-bold flex items-center justify-center gap-1 ${isGrowing ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
+                {isGrowing ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                {prevMonthRevenue > 0 ? `${trendPercent > 0 ? '+' : ''}${trendPercent.toFixed(1)}%` : '—'}
+              </p>
+              <p className="text-[10px] text-muted-foreground font-medium">Variación</p>
+              <p className="text-[9px] text-muted-foreground/70 mt-0.5">{FINANCE_MONTH_FULL[currentMonthIdx]} vs {currentMonthIdx > 0 ? FINANCE_MONTH_FULL[currentMonthIdx - 1] : '—'}</p>
+            </div>
           </div>
         </div>
 
@@ -396,7 +723,7 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
                   const icon = cleanName === 'Ingresos' ? '💰' : cleanName === 'Ganancia' ? '📈' : '📉';
                   return [formatCOP(value), `${icon} ${cleanName}${isProj ? ' (proyección)' : ''}`];
                 }}
-                labelFormatter={(label) => `${MONTH_FULL[MONTH_NAMES.indexOf(label)]} ${selectedYear}`}
+                labelFormatter={(label) => `${FINANCE_MONTH_FULL[FINANCE_MONTH_NAMES.indexOf(label)]} ${selectedYear}`}
               />
               {/* Líneas reales (sólidas) */}
               <Area type="monotone" dataKey="Ingresos" stroke="hsl(var(--primary))" strokeWidth={2.5} fill="url(#gradIngresos)" dot={{ r: 3, fill: 'hsl(var(--primary))' }} activeDot={{ r: 5 }} connectNulls={false} />
@@ -419,31 +746,127 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
       {/* Chart de Rentabilidad por plataforma */}
       {chartData.length > 0 && (
         <div className="bg-card rounded-xl border overflow-hidden animate-fade-in-up shadow-sm">
-          <div className="p-4 border-b flex justify-between items-center bg-muted/10">
+          <div className="p-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-muted/10">
             <div>
-              <h3 className="font-semibold text-sm sm:text-base">Análisis de Rentabilidad por Plataforma</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Ingresos divididos en Costo base (Abajo) y Ganancia Neta (Arriba)</p>
+              <h3 className="font-semibold text-sm sm:text-base flex items-center gap-1.5 text-foreground">
+                Rentabilidad Mensual por Plataforma
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Comparativa de costos operativos e ingresos netos mensuales
+              </p>
+            </div>
+            
+            {/* Control de escala optimizada premium */}
+            <div className="flex items-center gap-2 bg-muted/30 px-2.5 py-1 rounded-lg border text-xs font-medium">
+              <span className="text-muted-foreground">Escala optimizada</span>
+              <button
+                type="button"
+                onClick={() => setUseOptimizedScale(p => !p)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  useOptimizedScale ? 'bg-emerald-500' : 'bg-muted'
+                }`}
+                title="Permite que las plataformas con menores ingresos sean claramente visibles"
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-background shadow ring-0 transition duration-200 ease-in-out ${
+                    useOptimizedScale ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                />
+              </button>
             </div>
           </div>
-          <div className="p-4 pt-6">
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={chartData} barCategoryGap="25%" margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip
-                  cursor={{ fill: 'hsl(var(--muted)/0.4)' }}
-                  formatter={(value: number, name: string) => [formatCOP(value), name === 'Ganancia' ? '💰 Ganancia Neta' : '📉 Costos (Inversión)']}
-                  contentStyle={{ borderRadius: '12px', border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', fontSize: '13px', padding: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                  itemStyle={{ fontWeight: 600, padding: '2px 0' }}
-                />
-                <Bar dataKey="Costo" stackId="a" fill="hsl(var(--destructive)/0.25)" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="Ganancia" stackId="a" radius={[6, 6, 0, 0]}>
-                  {chartData.map((entry, i) => (
-                    <Cell key={i} fill={getPlatformBrandColor(entry.name)} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+
+          <div className="p-5">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Columna Izquierda: Gráfico stacked con logos */}
+              <div className="lg:col-span-7 xl:col-span-8 flex flex-col justify-between min-h-[300px] w-full overflow-x-auto scrollbar-thin">
+                <div className="min-w-[520px] lg:min-w-full h-[290px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={displayChartData} barCategoryGap="25%" margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+                      <XAxis dataKey="name" tick={<CustomXAxisTick logoErrors={logoErrors} setLogoErrors={setLogoErrors} />} interval={0} height={55} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip cursor={{ fill: 'hsl(var(--muted)/0.2)' }} content={<CustomChartTooltip />} />
+                      <Bar dataKey="Costo" stackId="a" fill="hsl(var(--destructive)/0.2)" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="Ganancia" stackId="a" radius={[6, 6, 0, 0]}>
+                        {displayChartData.map((entry, i) => (
+                          <Cell key={i} fill={getPlatformBrandColor(entry.name)} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Columna Derecha: Tarjetas detalladas de plataforma tipo Mockup */}
+              <div className="lg:col-span-5 xl:col-span-4 space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
+                {stats.platformStats.map(ps => {
+                  const details = getPlatformLogoDetails(ps.platform);
+                  const color = getPlatformBrandColor(ps.platform);
+                  const hasError = logoErrors[ps.platform];
+                  const showImage = details?.logoUrl && !hasError;
+                  
+                  return (
+                    <div key={ps.platform} className="bg-muted/10 dark:bg-zinc-900/30 border rounded-xl p-3.5 space-y-2 transition-all hover:bg-muted/20 dark:hover:bg-zinc-900/60">
+                      {/* Logo y Nombre + Costo */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {showImage ? (
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 border border-white/10 ${details.bgClass || 'bg-white'}`}>
+                              <img
+                                src={details.logoUrl}
+                                alt={ps.platform}
+                                className="w-4 h-4 object-contain"
+                                onError={() => setLogoErrors(prev => ({ ...prev, [ps.platform]: true }))}
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-white font-bold text-[10px]" style={{ backgroundColor: color }}>
+                              {details?.emoji || ps.platform.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <span className="font-bold text-xs text-foreground truncate">{ps.platform}</span>
+                        </div>
+                        <span className="text-red-500 dark:text-red-400 font-semibold text-xs shrink-0">{formatCOP(ps.cost)}</span>
+                      </div>
+                      
+                      {/* Margen y Totales */}
+                      <div className="grid grid-cols-2 gap-2 border-t border-zinc-800/30 pt-2 text-xs">
+                        <div>
+                          <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            {ps.marginPercent.toFixed(0)}%
+                          </div>
+                          <div className="text-[9px] text-muted-foreground font-medium mt-0.5">Margen</div>
+                        </div>
+                        <div className="text-right space-y-0.5 min-w-0">
+                          <div className="text-emerald-600 dark:text-emerald-400 font-bold truncate">{formatCOP(ps.profit)}</div>
+                          <div className="text-foreground font-bold text-xs truncate">{formatCOP(ps.revenue)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Leyenda premium e indicador de ganancia mensual al pie */}
+          <div className="px-4 py-3 bg-muted/5 border-t flex flex-col sm:flex-row justify-between items-center gap-3">
+            <div className="flex flex-wrap items-center gap-4 text-xs">
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <span className="w-2.5 h-2.5 rounded-sm bg-destructive/20 border border-destructive/30 inline-block" />
+                Costo (Inversión)
+              </span>
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" />
+                Ganancia Neta (Tu beneficio)
+              </span>
+            </div>
+            
+            <div className="bg-muted/30 dark:bg-zinc-800/40 px-4 py-1.5 rounded-full border text-xs font-semibold text-foreground flex items-center gap-2">
+              <span className="text-muted-foreground">Total Mensual de Ganancia:</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold">{formatCOP(stats.totalProfit)}</span>
+            </div>
           </div>
         </div>
       )}
