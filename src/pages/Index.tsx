@@ -605,6 +605,46 @@ function IndexContent() {
       upsertContact(sub.clientName, sub.clientPhone || null, 'client');
     }
 
+    // Sincronizar PIN o Nombre del perfil a la cuenta maestra en Supabase y localmente
+    if (sub.master_account_id && editing && editing.master_account_id === sub.master_account_id) {
+      const pinChanged = String(editing.profilePin) !== String(sub.profilePin);
+      
+      const oldNameClean = (editing.accountName || '').startsWith('Perfil: ') 
+        ? editing.accountName.substring('Perfil: '.length) 
+        : (editing.accountName || '');
+      const newNameClean = (sub.accountName || '').startsWith('Perfil: ') 
+        ? sub.accountName.substring('Perfil: '.length) 
+        : (sub.accountName || '');
+      const nameChanged = oldNameClean !== newNameClean;
+
+      if (pinChanged || nameChanged) {
+        const ma = masterAccounts.find(m => m.id === sub.master_account_id);
+        if (ma && ma.profiles_config) {
+          const updatedConfig = ma.profiles_config.map((prof: any) => {
+            if (String(prof.pin) === String(editing.profilePin)) {
+              return {
+                ...prof,
+                pin: sub.profilePin,
+                name: newNameClean
+              };
+            }
+            return prof;
+          });
+
+          const { error: maUpdateError } = await supabase
+            .from('master_accounts')
+            .update({ profiles_config: updatedConfig })
+            .eq('id', ma.id);
+
+          if (!maUpdateError) {
+            setMasterAccounts(prev => prev.map(m => m.id === ma.id ? { ...m, profiles_config: updatedConfig } : m));
+          } else {
+            console.error('Error syncing profile config to master account:', maUpdateError);
+          }
+        }
+      }
+    }
+
     // Lógica para detectar cambio de credenciales
     let updatedSubs = [...subs];
     const isMasterAccountChanged = !!(editing && editing.master_account_id !== sub.master_account_id);
@@ -724,6 +764,62 @@ function IndexContent() {
       s.id === id ? { ...s, purchaseDate: newPurchaseDate, paymentStatus: 'pagado' } : s
     ));
     toast.success('¡Suscripción renovada exitosamente!');
+  };
+
+  const handleProfilesChanged = async (
+    masterAccountId: string,
+    oldProfiles: { name: string; pin: string }[],
+    newProfiles: { name: string; pin: string }[]
+  ) => {
+    // Buscar todas las suscripciones asociadas a esta cuenta maestra
+    const affectedSubs = subs.filter(s => s.master_account_id === masterAccountId);
+    if (affectedSubs.length === 0) return;
+
+    let localSubsUpdated = [...subs];
+
+    // Comparar por índice para identificar qué cambió en la configuración de perfiles
+    for (let i = 0; i < oldProfiles.length; i++) {
+      const oldProf = oldProfiles[i];
+      const newProf = newProfiles[i];
+      if (!newProf) continue; // Si se redujo la cantidad de perfiles
+
+      if (String(oldProf.pin) !== String(newProf.pin) || oldProf.name !== newProf.name) {
+        // Encontrar las suscripciones locales que tenían el pin viejo
+        const subsToUpdate = affectedSubs.filter(s => String(s.profilePin) === String(oldProf.pin));
+        
+        if (subsToUpdate.length > 0) {
+          const updatePayload = {
+            profile_pin: newProf.pin,
+            account_name: newProf.name ? `Perfil: ${newProf.name}` : ''
+          };
+
+          for (const subToUp of subsToUpdate) {
+            const { error } = await supabase
+              .from('subscriptions')
+              .update(updatePayload)
+              .eq('id', subToUp.id);
+            
+            if (error) {
+              console.error('Error syncing profile config to subscription:', error);
+            }
+          }
+
+          // Actualizar estado local
+          localSubsUpdated = localSubsUpdated.map(s => {
+            if (s.master_account_id === masterAccountId && String(s.profilePin) === String(oldProf.pin)) {
+              return {
+                ...s,
+                profilePin: newProf.pin,
+                accountName: newProf.name ? `Perfil: ${newProf.name}` : ''
+              };
+            }
+            return s;
+          });
+        }
+      }
+    }
+
+    setSubs(localSubsUpdated);
   };
 
   const handleDeleteRequest = (id: string) => {
@@ -975,6 +1071,7 @@ function IndexContent() {
                 });
               }
             }}
+            onProfilesChanged={handleProfilesChanged}
           />
         ) : activeTab === 'finance' ? (
           <FinanceSection 

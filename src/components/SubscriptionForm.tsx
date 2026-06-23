@@ -73,15 +73,20 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
   const availableMasterAccounts = useMemo(() => {
     return masterAccounts.filter(ma => {
       if (ma.platform !== form.platform) return false;
+      // Always include the current master account of the subscription being edited
+      if (initial && (initial as any).master_account_id === ma.id) return true;
+      
       const assignedCount = allSubscriptions.filter(s => (s as any).master_account_id === ma.id)
         .reduce((sum, s) => sum + ((s as any).profiles_sold || 1), 0);
       return assignedCount < ma.total_profiles;
     }).map(ma => {
-      const assignedCount = allSubscriptions.filter(s => (s as any).master_account_id === ma.id)
+      // Exclude the current subscription slot from the calculation of available profiles
+      const assignedCount = allSubscriptions
+        .filter(s => (s as any).master_account_id === ma.id && s.id !== initial?.id)
         .reduce((sum, s) => sum + ((s as any).profiles_sold || 1), 0);
       return { ...ma, assigned: assignedCount, available: ma.total_profiles - assignedCount };
     });
-  }, [masterAccounts, form.platform, allSubscriptions, open]);
+  }, [masterAccounts, form.platform, allSubscriptions, open, initial]);
 
   useEffect(() => {
     if (open) {
@@ -93,10 +98,13 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
     }
   }, [open, initial]);
 
-  // When platform changes, reset stock selection
+  // When platform changes, reset stock selection, but preserve if it matches the initial platform on edit
   useEffect(() => {
+    if (initial && form.platform === initial.platform) {
+      return;
+    }
     setSelectedMasterAccountId('');
-  }, [form.platform]);
+  }, [form.platform, initial]);
 
   // ── Autocompletado de clientes ──
   const clientSuggestions = useMemo(() => {

@@ -21,11 +21,12 @@ interface Props {
   dynamicPlatforms: string[];
   onAccountsChange: (accounts: MasterAccount[]) => void;
   onCredentialsChanged?: (masterAccountId: string, newEmail: string, newPassword: string, platform: string, emailChanged: boolean, passwordChanged: boolean) => void;
+  onProfilesChanged?: (masterAccountId: string, oldProfiles: { name: string; pin: string }[], newProfiles: { name: string; pin: string }[]) => Promise<void>;
   providerContacts?: Contact[];
   onProviderSaved?: (name: string, phone: string | null) => void;
 }
 
-export default function AccountsSection({ accounts, subscriptions, dynamicPlatforms, onAccountsChange, onCredentialsChanged, providerContacts = [], onProviderSaved }: Props) {
+export default function AccountsSection({ accounts, subscriptions, dynamicPlatforms, onAccountsChange, onCredentialsChanged, onProfilesChanged, providerContacts = [], onProviderSaved }: Props) {
   const { user } = useAuth();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<MasterAccount | null>(null);
@@ -213,6 +214,26 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
       // Guardar proveedor en contactos persistentes
       if (form.supplier_name?.trim() && onProviderSaved) {
         onProviderSaved(form.supplier_name, form.supplier_phone || null);
+      }
+
+      // Si cambió la configuración de perfiles (PIN o Nombre), propagar a las suscripciones
+      const oldConfig = editing.profiles_config || [];
+      const newConfig = form.profiles_config || [];
+      let profilesChanged = false;
+      if (oldConfig.length !== newConfig.length) {
+        profilesChanged = true;
+      } else {
+        for (let i = 0; i < oldConfig.length; i++) {
+          if (!newConfig[i]) continue;
+          if (String(oldConfig[i].pin) !== String(newConfig[i].pin) || oldConfig[i].name !== newConfig[i].name) {
+            profilesChanged = true;
+            break;
+          }
+        }
+      }
+
+      if (profilesChanged && onProfilesChanged) {
+        await onProfilesChanged(editing.id, oldConfig, newConfig);
       }
 
       // Si correo o contraseña cambiaron, invocar callback para notificar clientes
