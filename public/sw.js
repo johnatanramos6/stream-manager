@@ -1,4 +1,4 @@
-const CACHE_NAME = 'streammanager-v2';
+const CACHE_NAME = 'streammanager-v3';
 const ASSETS_TO_CACHE = [
   '/stream-manager/',
   '/stream-manager/index.html',
