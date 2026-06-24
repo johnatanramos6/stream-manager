@@ -39,6 +39,11 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
   const [showExpiryPanel, setShowExpiryPanel] = useState(false);
   const [showProviderSuggestions, setShowProviderSuggestions] = useState(false);
   const providerInputRef = useRef<HTMLInputElement>(null);
+  const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
+
+  const toggleExpand = (id: string) => {
+    setExpandedCards(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   // Helper: Sincronizar perfiles
   const syncProfilesConfig = (total: number, currentConfigs: { name: string; pin: string }[] = []) => {
@@ -330,24 +335,24 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
   return (
     <div className="space-y-5 animate-fade-in">
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="bg-card border rounded-xl p-3 sm:p-4">
+      <div className="flex overflow-x-auto gap-3 pb-3 -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-5 snap-x no-scrollbar">
+        <div className="bg-card border rounded-xl p-3 sm:p-4 shrink-0 min-w-[130px] sm:min-w-0 flex-1 snap-align-start">
           <p className="text-[10px] sm:text-xs text-muted-foreground">Cuentas en Stock</p>
           <p className="text-xl sm:text-2xl font-bold">{totalAccounts}</p>
         </div>
-        <div className="bg-card border rounded-xl p-3 sm:p-4">
+        <div className="bg-card border rounded-xl p-3 sm:p-4 shrink-0 min-w-[130px] sm:min-w-0 flex-1 snap-align-start">
           <p className="text-[10px] sm:text-xs text-muted-foreground">Perfiles Totales</p>
           <p className="text-xl sm:text-2xl font-bold">{totalProfiles}</p>
         </div>
-        <div className="bg-card border rounded-xl p-3 sm:p-4">
+        <div className="bg-card border rounded-xl p-3 sm:p-4 shrink-0 min-w-[130px] sm:min-w-0 flex-1 snap-align-start">
           <p className="text-[10px] sm:text-xs text-emerald-500">Disponibles</p>
           <p className="text-xl sm:text-2xl font-bold text-emerald-500">{totalAvailable}</p>
         </div>
-        <div className="bg-card border rounded-xl p-3 sm:p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => { setFilterExpiry(f => f === 'expiring' ? 'all' : 'expiring'); setShowExpiryPanel(p => !p); }}>
+        <div className="bg-card border rounded-xl p-3 sm:p-4 shrink-0 min-w-[130px] sm:min-w-0 flex-1 snap-align-start cursor-pointer hover:shadow-md transition-shadow" onClick={() => { setFilterExpiry(f => f === 'expiring' ? 'all' : 'expiring'); setShowExpiryPanel(p => !p); }}>
           <p className="text-[10px] sm:text-xs text-amber-500 flex items-center gap-1"><Timer className="h-3 w-3" /> Por vencer</p>
           <p className={`text-xl sm:text-2xl font-bold ${totalUrgent > 0 ? 'text-amber-500' : 'text-muted-foreground'}`}>{totalUrgent}</p>
         </div>
-        <div className="bg-card border rounded-xl p-3 sm:p-4">
+        <div className="bg-card border rounded-xl p-3 sm:p-4 shrink-0 min-w-[130px] sm:min-w-0 flex-1 snap-align-start">
           <p className="text-[10px] sm:text-xs text-muted-foreground">Inversión Total</p>
           <p className="text-lg sm:text-xl font-bold">{formatCOP(totalInvested)}</p>
         </div>
@@ -440,16 +445,20 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Buscar por correo o plataforma..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
         </div>
-        <Select value={filterPlatform} onValueChange={setFilterPlatform}>
-          <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Plataforma" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas</SelectItem>
-            {dynamicPlatforms.map((p, i) => <SelectItem key={i} value={p}>{p}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Button onClick={() => handleOpenForm()} className="gap-1.5 shadow-lg shadow-primary/20">
-          <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Agregar Cuenta</span><span className="sm:hidden">Agregar</span>
-        </Button>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <Select value={filterPlatform} onValueChange={setFilterPlatform}>
+            <SelectTrigger className="flex-1 sm:w-[180px]"><SelectValue placeholder="Plataforma" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              {dynamicPlatforms.map((p, i) => <SelectItem key={i} value={p}>{p}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Button onClick={() => handleOpenForm()} className="gap-1.5 shadow-lg shadow-primary/20 shrink-0">
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Agregar Cuenta</span>
+            <span className="sm:hidden">Agregar</span>
+          </Button>
+        </div>
       </div>
 
       {/* Accounts Grid */}
@@ -466,9 +475,14 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
             const assigned = account.assigned_profiles!;
             const statusClass = getStatusColor(available, account.total_profiles);
             const costPerProfile = account.total_profiles > 0 ? Math.round(account.purchase_price / account.total_profiles) : 0;
+            const isExpanded = !!expandedCards[account.id];
 
             return (
-              <div key={account.id} className={`bg-card border rounded-xl p-4 space-y-3 hover:shadow-md transition-shadow ${getExpiryStatus(account.daysToExpiry).border}`}>
+              <div 
+                key={account.id} 
+                className={`bg-card border rounded-xl p-4 space-y-3 hover:shadow-md transition-all cursor-pointer sm:cursor-default ${getExpiryStatus(account.daysToExpiry).border}`}
+                onClick={() => toggleExpand(account.id)}
+              >
                 {/* Header */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -480,29 +494,13 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
                       </span>
                     )}
                   </div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusClass}`}>
-                    {available > 0 ? `${available} disponible${available > 1 ? 's' : ''}` : 'Completa'}
-                  </span>
-                </div>
-
-                {/* Email & Password */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2 text-xs">
-                    <Mail className="h-3 w-3 text-muted-foreground shrink-0" />
-                    <span className="font-mono truncate">{account.account_email}</span>
-                    <button onClick={() => copyText(`email-${account.id}`, account.account_email)} className="text-muted-foreground hover:text-foreground shrink-0">
-                      {copiedId === `email-${account.id}` ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <Lock className="h-3 w-3 text-muted-foreground shrink-0" />
-                    <span className="font-mono truncate">{showPasswords[account.id] ? account.account_password : '••••••••'}</span>
-                    <button onClick={() => togglePassword(account.id)} className="text-muted-foreground hover:text-foreground shrink-0">
-                      {showPasswords[account.id] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                    </button>
-                    <button onClick={() => copyText(`pass-${account.id}`, account.account_password)} className="text-muted-foreground hover:text-foreground shrink-0">
-                      {copiedId === `pass-${account.id}` ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
-                    </button>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusClass}`}>
+                      {available > 0 ? `${available} disponible${available > 1 ? 's' : ''}` : 'Completa'}
+                    </span>
+                    <div className="sm:hidden text-muted-foreground hover:text-foreground shrink-0 p-0.5">
+                      {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </div>
                   </div>
                 </div>
 
@@ -520,111 +518,148 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
                   </div>
                 </div>
 
-                {/* Custom Profiles list */}
-                {account.profiles_config && Array.isArray(account.profiles_config) && account.profiles_config.length > 0 && (
-                  <div className="border-t pt-2 space-y-1">
-                    <p className="text-[9px] font-semibold text-muted-foreground flex items-center gap-1">
-                      <Users className="h-3 w-3" /> Estado de Perfiles:
-                    </p>
-                    <div className="grid grid-cols-2 gap-1.5 max-h-[120px] overflow-y-auto pr-0.5">
-                      {account.profiles_config.map((prof: any, idx: number) => {
-                        const matchingSub = subscriptions.find(s => 
-                          (s as any).master_account_id === account.id && 
-                          String(s.profilePin) === String(prof.pin)
-                        );
-                        const isSold = !!matchingSub;
-                        return (
-                          <div 
-                            key={idx} 
-                            className={`text-[9px] px-2 py-1 rounded border flex flex-col justify-between ${
-                              isSold 
-                                ? 'bg-red-500/[0.03] border-red-500/10 text-muted-foreground' 
-                                : 'bg-emerald-500/[0.03] border-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                            }`}
-                          >
-                            <div className="flex justify-between items-center gap-1">
-                              <span className="font-semibold truncate max-w-[70px]" title={prof.name}>
-                                {prof.name || `Perfil ${idx + 1}`}
-                              </span>
-                              <span className="font-mono text-muted-foreground/80 shrink-0">🔑{prof.pin || 'S/N'}</span>
-                            </div>
-                            <span className="text-[8px] text-muted-foreground/80 mt-0.5 truncate">
-                              {isSold ? `👤 ${matchingSub.clientName}` : 'Disponible'}
-                            </span>
-                          </div>
-                        );
-                      })}
+                {/* Collapsible Content */}
+                <div className={`${isExpanded ? 'block animate-fade-in-up' : 'hidden sm:block'} space-y-3 pt-1 border-t sm:border-t-0`}>
+                  {/* Email & Password */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 text-xs min-w-0">
+                      <Mail className="h-3 w-3 text-muted-foreground shrink-0" />
+                      <span className="font-mono truncate flex-1 min-w-0">{account.account_email}</span>
+                      <button onClick={(e) => { e.stopPropagation(); copyText(`email-${account.id}`, account.account_email); }} className="text-muted-foreground hover:text-foreground shrink-0">
+                        {copiedId === `email-${account.id}` ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs min-w-0">
+                      <Lock className="h-3 w-3 text-muted-foreground shrink-0" />
+                      <span className="font-mono truncate flex-1 min-w-0">{showPasswords[account.id] ? account.account_password : '••••••••'}</span>
+                      <button onClick={(e) => { e.stopPropagation(); togglePassword(account.id); }} className="text-muted-foreground hover:text-foreground shrink-0">
+                        {showPasswords[account.id] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); copyText(`pass-${account.id}`, account.account_password); }} className="text-muted-foreground hover:text-foreground shrink-0">
+                        {copiedId === `pass-${account.id}` ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                      </button>
                     </div>
                   </div>
-                )}
 
-                {/* Financial info */}
-                <div className="flex justify-between items-center text-[10px] border-t pt-2 pb-1">
-                  <span className="text-muted-foreground flex items-center gap-1"><DollarSign className="h-3 w-3" /> Costo: <span className="text-foreground font-semibold">{formatCOP(account.purchase_price)}</span></span>
-                  <span className="text-muted-foreground">P/perfil: <span className="text-foreground font-semibold">{formatCOP(costPerProfile)}</span></span>
-                </div>
-                <div className="flex justify-between items-center text-[10px] pb-1">
-                  <span className="text-muted-foreground flex items-center gap-1"><CalendarDays className="h-3 w-3" /> Compra: <span className="text-foreground font-semibold">{account.purchase_date || 'N/A'}</span></span>
-                  <span className={`flex items-center gap-1 ${account.daysToExpiry <= 0 ? 'text-red-500' : account.daysToExpiry <= 3 ? 'text-amber-500' : 'text-muted-foreground'}`}>
-                    <Timer className="h-3 w-3" /> Vence: <span className="font-semibold">{account.expiryDate}</span>
-                  </span>
-                </div>
-
-                {/* Supplier info */}
-                {(account.supplier_name || account.supplier_phone) && (
-                  <div className="text-[10px] text-muted-foreground flex items-center gap-1 flex-wrap">
-                    {account.supplier_name && <><User className="h-3 w-3" /> <span className="text-foreground font-semibold">{account.supplier_name}</span></>}
-                    {account.supplier_name && account.supplier_phone && <span className="mx-1">|</span>}
-                    {account.supplier_phone && <><Phone className="h-3 w-3" /> <span className="text-foreground font-semibold">{account.supplier_phone}</span></>}
-                  </div>
-                )}
-
-                {/* Notes */}
-                {account.notes && (
-                  <p className="text-[10px] text-muted-foreground italic truncate">📝 {account.notes}</p>
-                )}
-
-                {/* Actions */}
-                <div className="flex flex-col gap-1.5 pt-1">
-                  {account.supplier_phone && (
-                    <div className="flex gap-1.5">
-                      <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] text-green-600 hover:bg-green-600/10 border-green-600/30" onClick={() => {
-                        const phone = account.supplier_phone!.replace(/\D/g, '');
-                        const provName = account.supplier_name || 'Proveedor';
-                        const purchaseD = new Date((account.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
-                        const cutoff = new Date(purchaseD); cutoff.setDate(cutoff.getDate() + (account.duration_days || 30));
-                        const fmtDate = (d: Date) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
-                        const msg = `Hola¡ ${provName} le escribo por el siguiente servicio de ${account.platform}\n\n📧 Correo: ${account.account_email}\n🔑 Contraseña: ${account.account_password}\n🗓️ Fecha de inicio: ${fmtDate(purchaseD)}\n☢️ Fecha de fin: ${fmtDate(cutoff)}\n\nSolicito renovacion del servicio.`;
-                        window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`, '_blank');
-                      }}>
-                        <MessageCircle className="h-3 w-3 mr-1" /> Pedir Renovar
-                      </Button>
-                      <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] text-amber-600 hover:bg-amber-600/10 border-amber-600/30" onClick={() => {
-                        const phone = account.supplier_phone!.replace(/\D/g, '');
-                        const provName = account.supplier_name || 'Proveedor';
-                        const purchaseD = new Date((account.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
-                        const cutoff = new Date(purchaseD); cutoff.setDate(cutoff.getDate() + (account.duration_days || 30));
-                        const fmtDate = (d: Date) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
-                        const msg = `Hola¡ ${provName} le escribo por el siguiente servicio de ${account.platform}\n\n📧 Correo: ${account.account_email}\n🔑 Contraseña: ${account.account_password}\n🗓️ Fecha de inicio: ${fmtDate(purchaseD)}\n☢️ Fecha de fin: ${fmtDate(cutoff)}\n\nSolicito soporte ante un inconveniente con el servicio.`;
-                        window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`, '_blank');
-                      }}>
-                        <Wrench className="h-3 w-3 mr-1" /> Soporte
-                      </Button>
+                  {/* Custom Profiles list */}
+                  {account.profiles_config && Array.isArray(account.profiles_config) && account.profiles_config.length > 0 && (
+                    <div className="border-t pt-2 space-y-1">
+                      <p className="text-[9px] font-semibold text-muted-foreground flex items-center gap-1">
+                        <Users className="h-3 w-3" /> Estado de Perfiles:
+                      </p>
+                      <div className="grid grid-cols-2 gap-1.5 max-h-[120px] overflow-y-auto pr-0.5">
+                        {account.profiles_config.map((prof: any, idx: number) => {
+                          const matchingSub = subscriptions.find(s => 
+                            (s as any).master_account_id === account.id && 
+                            String(s.profilePin) === String(prof.pin)
+                          );
+                          const isSold = !!matchingSub;
+                          return (
+                            <div 
+                              key={idx} 
+                              className={`text-[9px] px-2 py-1 rounded border flex flex-col justify-between ${
+                                isSold 
+                                  ? 'bg-red-500/[0.03] border-red-500/10 text-muted-foreground' 
+                                  : 'bg-emerald-500/[0.03] border-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                              }`}
+                            >
+                              <div className="flex justify-between items-center gap-1">
+                                <span className="font-semibold truncate max-w-[70px]" title={prof.name}>
+                                  {prof.name || `Perfil ${idx + 1}`}
+                                </span>
+                                <span className="font-mono text-muted-foreground/80 shrink-0">🔑{prof.pin || 'S/N'}</span>
+                              </div>
+                              <span className="text-[8px] text-muted-foreground/80 mt-0.5 truncate">
+                                {isSold ? `👤 ${matchingSub.clientName}` : 'Disponible'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
-                  <Button size="sm" variant="outline" className="w-full h-7 text-[10px] text-emerald-600 hover:bg-emerald-600/10 border-emerald-600/30 font-medium" onClick={() => handleRenewAccount(account)}>
-                    <RefreshCw className="h-3 w-3 mr-1" /> Renovar en Sistema (Añadir {account.duration_days || 30} días)
-                  </Button>
-                </div>
 
-                {/* Actions */}
-                <div className="flex gap-1.5 pt-1">
-                  <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px]" onClick={() => handleOpenForm(account)}>
-                    <Pencil className="h-3 w-3 mr-1" /> Editar
-                  </Button>
-                  <Button size="sm" variant="outline" className="h-7 text-[10px] text-destructive hover:bg-destructive/10" onClick={() => setDeleteId(account.id)}>
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
+                  {/* Financial info */}
+                  <div className="flex justify-between items-center text-[10px] border-t pt-2 pb-1">
+                    <span className="text-muted-foreground flex items-center gap-1"><DollarSign className="h-3 w-3" /> Costo: <span className="text-foreground font-semibold">{formatCOP(account.purchase_price)}</span></span>
+                    <span className="text-muted-foreground">P/perfil: <span className="text-foreground font-semibold">{formatCOP(costPerProfile)}</span></span>
+                  </div>
+                  <div className="flex justify-between items-center text-[10px] pb-1">
+                    <span className="text-muted-foreground flex items-center gap-1"><CalendarDays className="h-3 w-3" /> Compra: <span className="text-foreground font-semibold">{account.purchase_date || 'N/A'}</span></span>
+                    <span className={`flex items-center gap-1 ${account.daysToExpiry <= 0 ? 'text-red-500' : account.daysToExpiry <= 3 ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                      <Timer className="h-3 w-3" /> Vence: <span className="font-semibold">{account.expiryDate}</span>
+                    </span>
+                  </div>
+
+                  {/* Supplier info */}
+                  {(account.supplier_name || account.supplier_phone) && (
+                    <div className="text-[10px] text-muted-foreground flex items-center gap-1 flex-wrap">
+                      {account.supplier_name && <><User className="h-3 w-3" /> <span className="text-foreground font-semibold">{account.supplier_name}</span></>}
+                      {account.supplier_name && account.supplier_phone && <span className="mx-1">|</span>}
+                      {account.supplier_phone && <><Phone className="h-3 w-3" /> <span className="text-foreground font-semibold">{account.supplier_phone}</span></>}
+                    </div>
+                  )}
+
+                  {/* Notes */}
+                  {account.notes && (
+                    <p className="text-[10px] text-muted-foreground italic truncate">📝 {account.notes}</p>
+                  )}
+
+                  {/* Actions Grid */}
+                  <div className="flex flex-col gap-1.5 pt-2 border-t">
+                    {account.supplier_phone && (
+                      <div className="flex gap-1.5">
+                        <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] text-green-600 hover:bg-green-600/10 border-green-600/30" onClick={(e) => {
+                          e.stopPropagation();
+                          const phone = account.supplier_phone!.replace(/\D/g, '');
+                          const provName = account.supplier_name || 'Proveedor';
+                          const purchaseD = new Date((account.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
+                          const cutoff = new Date(purchaseD); cutoff.setDate(cutoff.getDate() + (account.duration_days || 30));
+                          const fmtDate = (d: Date) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
+                          const msg = `Hola¡ ${provName} le escribo por el siguiente servicio de ${account.platform}\n\n📧 Correo: ${account.account_email}\n🔑 Contraseña: ${account.account_password}\n🗓️ Fecha de inicio: ${fmtDate(purchaseD)}\n☢️ Fecha de fin: ${fmtDate(cutoff)}\n\nSolicito renovacion del servicio.`;
+                          window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`, '_blank');
+                        }}>
+                          <MessageCircle className="h-3.5 w-3.5 mr-1 shrink-0" /> <span className="truncate">Pedir Renovar</span>
+                        </Button>
+                        <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] text-amber-600 hover:bg-amber-600/10 border-amber-600/30" onClick={(e) => {
+                          e.stopPropagation();
+                          const phone = account.supplier_phone!.replace(/\D/g, '');
+                          const provName = account.supplier_name || 'Proveedor';
+                          const purchaseD = new Date((account.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
+                          const cutoff = new Date(purchaseD); cutoff.setDate(cutoff.getDate() + (account.duration_days || 30));
+                          const fmtDate = (d: Date) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
+                          const msg = `Hola¡ ${provName} le escribo por el siguiente servicio de ${account.platform}\n\n📧 Correo: ${account.account_email}\n🔑 Contraseña: ${account.account_password}\n🗓️ Fecha de inicio: ${fmtDate(purchaseD)}\n☢️ Fecha de fin: ${fmtDate(cutoff)}\n\nSolicito soporte ante un inconveniente con el servicio.`;
+                          window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`, '_blank');
+                        }}>
+                          <Wrench className="h-3.5 w-3.5 mr-1 shrink-0" /> <span className="truncate">Soporte</span>
+                        </Button>
+                      </div>
+                    )}
+                    
+                    <div className="flex gap-1.5">
+                      <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] text-emerald-600 hover:bg-emerald-600/10 border-emerald-600/30 font-medium" onClick={(e) => {
+                        e.stopPropagation();
+                        handleRenewAccount(account);
+                      }}>
+                        <RefreshCw className="h-3.5 w-3.5 mr-1 shrink-0" />
+                        <span className="truncate">Renovar (+{account.duration_days || 30}d)</span>
+                      </Button>
+                      
+                      <Button size="sm" variant="outline" className="h-7 px-2.5 text-[10px]" onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenForm(account);
+                      }} title="Editar">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      
+                      <Button size="sm" variant="outline" className="h-7 px-2.5 text-[10px] text-destructive hover:bg-destructive/10" onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteId(account.id);
+                      }} title="Eliminar">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
             );
