@@ -469,7 +469,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
           <p className="text-xs mt-1">Agrega tu primera cuenta maestra para empezar a controlar el stock</p>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 items-start">
           {filtered.map(account => {
             const available = account.available_profiles!;
             const assigned = account.assigned_profiles!;
