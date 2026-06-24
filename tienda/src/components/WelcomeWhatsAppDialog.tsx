@@ -34,6 +34,18 @@ export default function WelcomeWhatsAppDialog({ open, onClose, subscription }: P
 
     const isFullAccount = (subscription.profiles_sold || 1) > 1;
 
+    const isM365Personal = 
+      (subscription.platform.toLowerCase().includes('microsoft 365') || 
+       subscription.platform.toLowerCase().includes('office 365') || 
+       subscription.platform.toLowerCase().includes('m365')) && 
+      subscription.platform.toLowerCase().includes('personal');
+
+    const extraInstructions = isM365Personal ? [
+      '',
+      '*ℹ️ Información Adicional:*',
+      'Ingresa a www.office.com e inicia sesión con el correo y la clave que te entregamos. Al ingresar, el sistema puede solicitar cambiar la clave; si decides hacerlo, no la pierdas, ya que en caso de olvido se pierde la garantía del servicio. Luego, dentro de la página selecciona Instalar aplicaciones y después Microsoft 365. Abre el archivo descargado e instala Office en tu computador. Finalmente, al abrir Word, Excel o PowerPoint, inicia sesión con la misma cuenta para que el producto quede correctamente activado. ℹ️'
+    ] : [];
+
     if (isFullAccount) {
       // Plantilla para cuenta completa
       const lines = [
@@ -48,6 +60,7 @@ export default function WelcomeWhatsAppDialog({ open, onClose, subscription }: P
         `*📅 Fecha de inicio:* ${formatDateES(subscription.purchaseDate)}`,
         `*⏳ Fecha de corte:* ${cutoffStr}`,
         '',
+        ...extraInstructions,
         '\u2705 Si tienes alg\u00FAn inconveniente, escr\u00EDbeme para ayudarte.',
         '\u2705 Gracias por confiar en nuestros servicios.'
       ];
@@ -73,6 +86,7 @@ export default function WelcomeWhatsAppDialog({ open, onClose, subscription }: P
       '* No cambies el correo, contrase\u00F1a, perfil ni PIN.',
       '* No compartas los datos de acceso con terceros.',
       '* Si tienes alg\u00FAn inconveniente, escr\u00EDbeme para ayudarte.',
+      ...extraInstructions,
       '',
       '\u2705 Gracias por confiar en mis servicios.',
       '\uD83C\uDF7F \u00A1Disfruta tu contenido!'

@@ -60,6 +60,18 @@ export default function StoreHistory({ reseller, managerId }: Props) {
     cutoffDate.setDate(cutoffDate.getDate() + duration);
     const cutoffStr = `${cutoffDate.getDate().toString().padStart(2, '0')}/${(cutoffDate.getMonth() + 1).toString().padStart(2, '0')}/${cutoffDate.getFullYear()}`;
 
+    const isM365Personal = 
+      (order.platform.toLowerCase().includes('microsoft 365') || 
+       order.platform.toLowerCase().includes('office 365') || 
+       order.platform.toLowerCase().includes('m365')) && 
+      order.platform.toLowerCase().includes('personal');
+
+    const extraInstructions = isM365Personal ? [
+      '',
+      '*ℹ️ Información Adicional:*',
+      'Ingresa a www.office.com e inicia sesión con el correo y la clave que te entregamos. Al ingresar, el sistema puede solicitar cambiar la clave; si decides hacerlo, no la pierdas, ya que en caso de olvido se pierde la garantía del servicio. Luego, dentro de la página selecciona Instalar aplicaciones y después Microsoft 365. Abre el archivo descargado e instala Office en tu computador. Finalmente, al abrir Word, Excel o PowerPoint, inicia sesión con la misma cuenta para que el producto quede correctamente activado. ℹ️'
+    ] : [];
+
     const isFullAccount = order.type === 'full_account';
     return isFullAccount 
       ? [
@@ -75,6 +87,8 @@ export default function StoreHistory({ reseller, managerId }: Props) {
           `⏳ Fecha de corte: ${cutoffStr}`,
           '',
           ...(creds.notes ? [`📝 ${creds.notes}`, ''] : []),
+          ...extraInstructions,
+          '',
           '✅ Si tienes algún inconveniente, escríbeme para ayudarte.',
           '✅ Gracias por confiar en nuestros servicios.'
         ].join('\n')
@@ -96,6 +110,7 @@ export default function StoreHistory({ reseller, managerId }: Props) {
           '* No cambies el correo, contraseña, perfil ni PIN.',
           '* No compartas los datos de acceso con terceros.',
           '* Si tienes algún inconveniente, escríbeme para ayudarte.',
+          ...extraInstructions,
           '',
           '✅ Gracias por confiar en mis servicios.',
           '🍿 ¡Disfruta tu contenido!'
