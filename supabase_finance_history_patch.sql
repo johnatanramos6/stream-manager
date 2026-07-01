@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS public.monthly_finance_snapshots (
 -- Habilitar RLS (Row Level Security)
 ALTER TABLE public.monthly_finance_snapshots ENABLE ROW LEVEL SECURITY;
 
+-- Limpiar políticas existentes para evitar errores por duplicado
+DROP POLICY IF EXISTS "Activos de finanzas por vendedor" ON public.monthly_finance_snapshots;
+DROP POLICY IF EXISTS "El Super-admin ve finanzas" ON public.monthly_finance_snapshots;
+
 -- Políticas de Seguridad (RLS)
 CREATE POLICY "Activos de finanzas por vendedor" ON public.monthly_finance_snapshots
   FOR ALL USING (auth.uid() = vendor_id);
