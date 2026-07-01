@@ -307,6 +307,26 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [useOptimizedScale, setUseOptimizedScale] = useState(false);
   const [logoErrors, setLogoErrors] = useState<Record<string, boolean>>({});
+  const [dbSnapshots, setDbSnapshots] = useState<any[]>([]);
+  const [loadingSnapshots, setLoadingSnapshots] = useState(true);
+
+  const fetchSnapshots = async () => {
+    if (!user) return;
+    setLoadingSnapshots(true);
+    const { data, error } = await supabase
+      .from('monthly_finance_snapshots')
+      .select('*')
+      .eq('vendor_id', user.id)
+      .eq('year', selectedYear);
+    if (data) {
+      setDbSnapshots(data);
+    }
+    setLoadingSnapshots(false);
+  };
+
+  useEffect(() => {
+    fetchSnapshots();
+  }, [selectedYear, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -407,8 +427,124 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
   // ── Datos mensuales para el gráfico de tendencia ──
   const currentMonthIdx = new Date().getMonth();
   const monthlyData = useMemo(() => {
-    return calculateMonthlyFinancialSnapshots(subscriptions, masterAccounts, pricing, selectedYear);
-  }, [subscriptions, masterAccounts, pricing, selectedYear]);
+    const calculated = calculateMonthlyFinancialSnapshots(subscriptions, masterAccounts, pricing, selectedYear);
+    if (loadingSnapshots) return calculated;
+
+    const currentYear = new Date().getFullYear();
+
+    return calculated.map((item, index) => {
+      const isFuture = selectedYear > currentYear || (selectedYear === currentYear && index > currentMonthIdx);
+      const isCurrentMonth = selectedYear === currentYear && index === currentMonthIdx;
+
+      if (isFuture) {
+        return item;
+      } else if (isCurrentMonth) {
+        return item;
+      } else {
+        const dbSnap = dbSnapshots.find(s => s.month === index);
+        if (dbSnap) {
+          return {
+            ...item,
+            Ingresos: Number(dbSnap.revenue),
+            Costos: Number(dbSnap.cost),
+            Ganancia: Number(dbSnap.profit),
+            clients: Number(dbSnap.clients)
+          };
+        } else {
+          return item;
+        }
+      }
+    });
+  }, [subscriptions, masterAccounts, pricing, selectedYear, dbSnapshots, loadingSnapshots, currentMonthIdx]);
+
+  // ── Sincronizar snapshots con la base de datos ──
+  useEffect(() => {
+    if (!user || loadingSnapshots) return;
+
+    const saveSnapshots = async () => {
+      const currentYear = new Date().getFullYear();
+      const currentMonth = new Date().getMonth();
+      let dbUpdated = false;
+
+      // 1. Guardar/actualizar el mes actual (si es el año seleccionado)
+      if (selectedYear === currentYear) {
+        const currentMonthData = monthlyData[currentMonth];
+        if (currentMonthData) {
+          const dbCurrentMonth = dbSnapshots.find(s => s.month === currentMonth);
+          const hasChanged = !dbCurrentMonth || 
+            Number(dbCurrentMonth.revenue) !== (currentMonthData.Ingresos || 0) ||
+            Number(dbCurrentMonth.cost) !== (currentMonthData.Costos || 0) ||
+            Number(dbCurrentMonth.profit) !== (currentMonthData.Ganancia || 0) ||
+            Number(dbCurrentMonth.clients) !== (currentMonthData.clients || 0);
+
+          if (hasChanged) {
+            const { error } = await supabase
+              .from('monthly_finance_snapshots')
+              .upsert({
+                vendor_id: user.id,
+                year: selectedYear,
+                month: currentMonth,
+                revenue: currentMonthData.Ingresos || 0,
+                cost: currentMonthData.Costos || 0,
+                profit: currentMonthData.Ganancia || 0,
+                clients: currentMonthData.clients || 0,
+                updated_at: new Date().toISOString()
+              }, { onConflict: 'vendor_id,year,month' });
+            
+            if (!error) {
+              dbUpdated = true;
+            } else {
+              console.error("Error saving current month snapshot:", error);
+            }
+          }
+        }
+      }
+
+      // 2. Guardar meses pasados que falten en la BD para congelarlos
+      const pastMonthsToFreeze = monthlyData.map((item, index) => ({ item, index }))
+        .filter(({ item, index }) => {
+          const isPast = selectedYear < currentYear || (selectedYear === currentYear && index < currentMonth);
+          const existsInDb = dbSnapshots.some(s => s.month === index);
+          return isPast && !existsInDb;
+        });
+
+      if (pastMonthsToFreeze.length > 0) {
+        for (const { item, index } of pastMonthsToFreeze) {
+          const { error } = await supabase
+            .from('monthly_finance_snapshots')
+            .upsert({
+              vendor_id: user.id,
+              year: selectedYear,
+              month: index,
+              revenue: item.Ingresos || 0,
+              cost: item.Costos || 0,
+              profit: item.Ganancia || 0,
+              clients: item.clients || 0,
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'vendor_id,year,month' });
+          
+          if (!error) {
+            dbUpdated = true;
+          } else {
+            console.error(`Error freezing past month ${index} snapshot:`, error);
+          }
+        }
+      }
+
+      if (dbUpdated) {
+        const { data } = await supabase
+          .from('monthly_finance_snapshots')
+          .select('*')
+          .eq('vendor_id', user.id)
+          .eq('year', selectedYear);
+        if (data) {
+          setDbSnapshots(data);
+        }
+      }
+    };
+
+    saveSnapshots();
+  }, [monthlyData, selectedYear, user, loadingSnapshots, dbSnapshots]);
 
   // Solo sumar meses reales (no futuros) para el total anual
   const realMonths = monthlyData.filter(m => !m.isFuture);
