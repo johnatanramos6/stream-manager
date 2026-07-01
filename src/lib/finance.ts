@@ -191,10 +191,14 @@ export function calculateMonthlyFinancialSnapshots(
   return MONTH_NAMES.map((month, index) => {
     const isFuture = isCurrentYear && index > currentMonthIdx;
     const targetMonth = new Date(selectedYear, index, 1);
-    const subsInMonth = subscriptions.filter(sub => getMonthStartFromDate(sub.purchaseDate) <= targetMonth);
+    const subsInMonth = subscriptions.filter(sub => {
+      const subMonth = getMonthStartFromDate(sub.purchaseDate);
+      return subMonth.getFullYear() === selectedYear && subMonth.getMonth() === index;
+    });
     const maInMonth = masterAccounts.filter(ma => {
       const purchaseDate = ma.purchase_date || new Date().toISOString().split('T')[0];
-      return getMonthStartFromDate(purchaseDate) <= targetMonth;
+      const maMonth = getMonthStartFromDate(purchaseDate);
+      return maMonth.getFullYear() === selectedYear && maMonth.getMonth() === index;
     });
     const uniqueManualAccounts = new Set<string>();
 
