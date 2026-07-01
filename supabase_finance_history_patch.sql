@@ -87,7 +87,7 @@ ma_cycles AS (
 ),
 monthly_stats AS (
   SELECT 
-    v.id as vendor_id,
+    v.auth_user_id as vendor_id,
     2026 as year,
     m.month_val as month,
     
@@ -101,7 +101,7 @@ monthly_stats AS (
         )
       )
       FROM sub_cycles s
-      WHERE s.vendor_id = v.id
+      WHERE s.vendor_id = v.auth_user_id
         AND EXTRACT(YEAR FROM s.cycle_date) = 2026
         AND EXTRACT(MONTH FROM s.cycle_date) - 1 = m.month_val
     ), 0) as revenue,
@@ -110,7 +110,7 @@ monthly_stats AS (
     COALESCE((
       SELECT SUM(ma.purchase_price)
       FROM ma_cycles ma
-      WHERE ma.vendor_id = v.id
+      WHERE ma.vendor_id = v.auth_user_id
         AND EXTRACT(YEAR FROM ma.cycle_date) = 2026
         AND EXTRACT(MONTH FROM ma.cycle_date) - 1 = m.month_val
     ), 0) as cost,
@@ -131,7 +131,7 @@ monthly_stats AS (
         )
       )
       FROM sub_cycles s
-      WHERE s.vendor_id = v.id
+      WHERE s.vendor_id = v.auth_user_id
         AND EXTRACT(YEAR FROM s.cycle_date) = 2026
         AND EXTRACT(MONTH FROM s.cycle_date) - 1 = m.month_val
     ), 0) as profit,
@@ -140,13 +140,14 @@ monthly_stats AS (
     COALESCE((
       SELECT COUNT(DISTINCT s.id)
       FROM sub_cycles s
-      WHERE s.vendor_id = v.id
+      WHERE s.vendor_id = v.auth_user_id
         AND EXTRACT(YEAR FROM s.cycle_date) = 2026
         AND EXTRACT(MONTH FROM s.cycle_date) - 1 = m.month_val
     ), 0) as clients
     
   FROM public.vendors v
   CROSS JOIN (SELECT 4 as month_val UNION ALL SELECT 5) m
+  WHERE v.auth_user_id IS NOT NULL
 )
 SELECT vendor_id, year, month, revenue, cost, profit, clients
 FROM monthly_stats
