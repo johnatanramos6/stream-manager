@@ -25,6 +25,7 @@ import {
 import { toast } from 'sonner';
 import { formatCOP } from '@/types/platformPricing';
 import type { StoreOrder } from '@/types/storefront';
+import { getLocalDateString } from '@/lib/utils';
 
 interface StoreOrderResultProps {
   order: StoreOrder;
@@ -109,7 +110,7 @@ export default function StoreOrderResult({
     return () => clearTimeout(timer);
   }, []);
 
-  const purchaseDate = credentials.purchase_date || (order.created_at ? order.created_at.split('T')[0] : new Date().toISOString().split('T')[0]);
+  const purchaseDate = credentials.purchase_date || (order.created_at ? getLocalDateString(new Date(order.created_at)) : getLocalDateString());
   const duration = credentials.duration_days || 30;
 
   const purchaseD = new Date(purchaseDate + 'T12:00:00');

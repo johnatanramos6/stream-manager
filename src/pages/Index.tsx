@@ -24,6 +24,7 @@ import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { getLocalDateString } from '@/lib/utils';
 import { useContacts } from '@/hooks/useContacts';
 import Login from '@/components/Login';
 import AdminPanel from '@/components/AdminPanel';
@@ -114,7 +115,7 @@ function exportExcel(subs: Subscription[], masterAccounts: MasterAccount[], pric
     });
 
     const maInMonth = masterAccounts.filter(ma => {
-      const d = new Date((ma.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
+      const d = new Date((ma.purchase_date || getLocalDateString()) + 'T12:00:00');
       const maStart = new Date(d.getFullYear(), d.getMonth(), 1);
       const targetMonthDate = new Date(currentYear, m, 1);
       return maStart <= targetMonthDate;
@@ -212,7 +213,7 @@ function exportExcel(subs: Subscription[], masterAccounts: MasterAccount[], pric
   XLSX.utils.book_append_sheet(wb, wsFinance, 'Resumen Financiero');
 
   try {
-    const filename = `StreamManager_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const filename = `StreamManager_${getLocalDateString()}.xlsx`;
     XLSX.writeFile(wb, filename);
     toast.success('Reporte Excel descargado con éxito');
   } catch (error) {
@@ -519,7 +520,7 @@ function IndexContent() {
         
         const rawDate = safeGet(fields, idxDate, 6);
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-        const finalDate = dateRegex.test(rawDate) ? rawDate : new Date().toISOString().split('T')[0];
+        const finalDate = dateRegex.test(rawDate) ? rawDate : getLocalDateString();
 
         const rawPrice = safeGet(fields, idxPrice, 10);
 
@@ -746,7 +747,7 @@ function IndexContent() {
     // Calcular nueva fecha sumando la duración a la fecha de compra actual
     const d = new Date(sub.purchaseDate + 'T12:00:00');
     d.setDate(d.getDate() + (sub.duration_days || 30));
-    const newPurchaseDate = d.toISOString().split('T')[0];
+    const newPurchaseDate = getLocalDateString(d);
 
     const { error } = await supabase.from('subscriptions')
       .update({ 

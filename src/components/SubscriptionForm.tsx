@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Package, Pencil, Users } from 'lucide-react';
+import { getLocalDateString } from '@/lib/utils';
 
 interface Props {
   open: boolean;
@@ -28,7 +29,7 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
     accountPassword: '',
     clientName: '',
     clientPhone: '',
-    purchaseDate: new Date().toISOString().split('T')[0],
+    purchaseDate: getLocalDateString(),
     profilePin: '',
     paymentStatus: 'debe',
     notes: '',
@@ -222,10 +223,10 @@ export default function SubscriptionForm({ open, onClose, onSave, initial, dynam
 
   // ── Calcular fecha de corte a partir de purchaseDate + duration_days ──
   const computeCutDate = (purchaseDate: string, durationDays: number): string => {
-    if (!purchaseDate) return new Date().toISOString().split('T')[0];
+    if (!purchaseDate) return getLocalDateString();
     const d = new Date(purchaseDate + 'T12:00:00');
     d.setDate(d.getDate() + durationDays);
-    return d.toISOString().split('T')[0];
+    return getLocalDateString(d);
   };
 
   const cutDate = useMemo(() => {

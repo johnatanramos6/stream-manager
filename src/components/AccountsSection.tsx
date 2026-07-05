@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { formatCOP } from '@/types/platformPricing';
 import { Package, Plus, Pencil, Trash2, Eye, EyeOff, Copy, Check, Search, Mail, Lock, Users, DollarSign, CalendarDays, Phone, MessageCircle, RefreshCw, Wrench, User, AlertTriangle, Clock, ChevronDown, ChevronUp, Timer } from 'lucide-react';
 import { toast } from 'sonner';
+import { getLocalDateString } from '@/lib/utils';
 
 interface Props {
   accounts: MasterAccount[];
@@ -69,7 +70,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
     total_profiles: 4, 
     purchase_price: 0, 
     notes: '', 
-    purchase_date: new Date().toISOString().split('T')[0], 
+    purchase_date: getLocalDateString(), 
     supplier_phone: '', 
     supplier_name: '', 
     duration_days: 30,
@@ -78,10 +79,10 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
   const [form, setForm] = useState(emptyForm);
 
   const computeCutDate = (purchaseDate: string, durationDays: number): string => {
-    if (!purchaseDate) return new Date().toISOString().split('T')[0];
+    if (!purchaseDate) return getLocalDateString();
     const d = new Date(purchaseDate + 'T12:00:00');
     d.setDate(d.getDate() + durationDays);
-    return d.toISOString().split('T')[0];
+    return getLocalDateString(d);
   };
 
   const cutDate = useMemo(() => {
@@ -172,7 +173,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
         total_profiles: account.total_profiles,
         purchase_price: account.purchase_price,
         notes: account.notes,
-        purchase_date: account.purchase_date || new Date().toISOString().split('T')[0],
+        purchase_date: account.purchase_date || getLocalDateString(),
         supplier_phone: account.supplier_phone || '',
         supplier_name: account.supplier_name || '',
         duration_days: account.duration_days || 30,
@@ -280,9 +281,9 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
   };
 
   const handleRenewAccount = async (account: MasterAccount) => {
-    const d = new Date((account.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
+    const d = new Date((account.purchase_date || getLocalDateString()) + 'T12:00:00');
     d.setDate(d.getDate() + (account.duration_days || 30));
-    const newDate = d.toISOString().split('T')[0];
+    const newDate = getLocalDateString(d);
 
     const { error } = await supabase.from('master_accounts')
       .update({ purchase_date: newDate })
@@ -391,7 +392,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
                       <Button size="sm" variant="outline" className="h-6 text-[9px] text-green-600 border-green-600/30" title="Enviar mensaje al proveedor" onClick={() => {
                         const phone = a.supplier_phone!.replace(/\D/g, '');
                         const provName = a.supplier_name || 'Proveedor';
-                        const purchaseD = new Date((a.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
+                        const purchaseD = new Date((a.purchase_date || getLocalDateString()) + 'T12:00:00');
                         const cutoff = new Date(purchaseD); cutoff.setDate(cutoff.getDate() + (a.duration_days || 30));
                         const fmtDate = (d: Date) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
                         const msg = `Hola¡ ${provName} le escribo por el siguiente servicio de ${a.platform}\n\n📧 Correo: ${a.account_email}\n🔑 Contraseña: ${a.account_password}\n🗓️ Fecha de inicio: ${fmtDate(purchaseD)}\n☢️ Fecha de fin: ${fmtDate(cutoff)}\n\nSolicito renovacion del servicio.`;
@@ -419,7 +420,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
                       <Button size="sm" variant="outline" className="h-6 text-[9px] text-green-600 border-green-600/30" title="Enviar mensaje al proveedor" onClick={() => {
                         const phone = a.supplier_phone!.replace(/\D/g, '');
                         const provName = a.supplier_name || 'Proveedor';
-                        const purchaseD = new Date((a.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
+                        const purchaseD = new Date((a.purchase_date || getLocalDateString()) + 'T12:00:00');
                         const cutoff = new Date(purchaseD); cutoff.setDate(cutoff.getDate() + (a.duration_days || 30));
                         const fmtDate = (d: Date) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
                         const msg = `Hola¡ ${provName} le escribo por el siguiente servicio de ${a.platform}\n\n📧 Correo: ${a.account_email}\n🔑 Contraseña: ${a.account_password}\n🗓️ Fecha de inicio: ${fmtDate(purchaseD)}\n☢️ Fecha de fin: ${fmtDate(cutoff)}\n\nSolicito renovacion del servicio.`;
@@ -613,7 +614,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
                           e.stopPropagation();
                           const phone = account.supplier_phone!.replace(/\D/g, '');
                           const provName = account.supplier_name || 'Proveedor';
-                          const purchaseD = new Date((account.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
+                          const purchaseD = new Date((account.purchase_date || getLocalDateString()) + 'T12:00:00');
                           const cutoff = new Date(purchaseD); cutoff.setDate(cutoff.getDate() + (account.duration_days || 30));
                           const fmtDate = (d: Date) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
                           const msg = `Hola¡ ${provName} le escribo por el siguiente servicio de ${account.platform}\n\n📧 Correo: ${account.account_email}\n🔑 Contraseña: ${account.account_password}\n🗓️ Fecha de inicio: ${fmtDate(purchaseD)}\n☢️ Fecha de fin: ${fmtDate(cutoff)}\n\nSolicito renovacion del servicio.`;
@@ -625,7 +626,7 @@ export default function AccountsSection({ accounts, subscriptions, dynamicPlatfo
                           e.stopPropagation();
                           const phone = account.supplier_phone!.replace(/\D/g, '');
                           const provName = account.supplier_name || 'Proveedor';
-                          const purchaseD = new Date((account.purchase_date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
+                          const purchaseD = new Date((account.purchase_date || getLocalDateString()) + 'T12:00:00');
                           const cutoff = new Date(purchaseD); cutoff.setDate(cutoff.getDate() + (account.duration_days || 30));
                           const fmtDate = (d: Date) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
                           const msg = `Hola¡ ${provName} le escribo por el siguiente servicio de ${account.platform}\n\n📧 Correo: ${account.account_email}\n🔑 Contraseña: ${account.account_password}\n🗓️ Fecha de inicio: ${fmtDate(purchaseD)}\n☢️ Fecha de fin: ${fmtDate(cutoff)}\n\nSolicito soporte ante un inconveniente con el servicio.`;

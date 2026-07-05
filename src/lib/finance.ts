@@ -1,6 +1,7 @@
 import { MasterAccount } from '@/types/masterAccount';
 import { PlatformPricing } from '@/types/platformPricing';
 import { Subscription } from '@/types/subscription';
+import { getLocalDateString } from './utils';
 
 export interface PlatformFinancialStats {
   platform: string;
@@ -196,7 +197,7 @@ export function calculateMonthlyFinancialSnapshots(
       return subMonth.getFullYear() === selectedYear && subMonth.getMonth() === index;
     });
     const maInMonth = masterAccounts.filter(ma => {
-      const purchaseDate = ma.purchase_date || new Date().toISOString().split('T')[0];
+      const purchaseDate = ma.purchase_date || getLocalDateString();
       const maMonth = getMonthStartFromDate(purchaseDate);
       return maMonth.getFullYear() === selectedYear && maMonth.getMonth() === index;
     });

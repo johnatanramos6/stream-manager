@@ -10,6 +10,7 @@ import { DollarSign, TrendingUp, TrendingDown, Users, Monitor, Save, AlertCircle
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
 import { MasterAccount } from '@/types/masterAccount';
 import { calculateCurrentFinancialStats, calculateMonthlyFinancialSnapshots, FINANCE_MONTH_FULL, FINANCE_MONTH_NAMES } from '@/lib/finance';
+import { getLocalDateString } from '@/lib/utils';
 
 interface Props {
   subscriptions: Subscription[];
@@ -304,7 +305,7 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [isSaving, setIsSaving] = useState(false);
   const [showDailyView, setShowDailyView] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(getLocalDateString());
   const [useOptimizedScale, setUseOptimizedScale] = useState(false);
   const [logoErrors, setLogoErrors] = useState<Record<string, boolean>>({});
   const [dbSnapshots, setDbSnapshots] = useState<any[]>([]);
@@ -641,7 +642,7 @@ export default function FinanceSection({ subscriptions, masterAccounts, onPricin
                 onChange={e => setSelectedDate(e.target.value)}
                 className="w-auto"
               />
-              <Button size="sm" variant="outline" onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}>
+              <Button size="sm" variant="outline" onClick={() => setSelectedDate(getLocalDateString())}>
                 Hoy
               </Button>
             </div>

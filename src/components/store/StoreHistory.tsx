@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { getPlatformEmoji } from '@/types/storefront';
 import { Calendar, CreditCard, ChevronDown, ChevronUp, Copy, Check, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { getLocalDateString } from '@/lib/utils';
 
 function formatDateES(dateStr: string): string {
   if (!dateStr) return 'N/A';
@@ -52,7 +53,7 @@ export default function StoreHistory({ reseller, managerId }: Props) {
 
   const getFormattedMessage = (order: StoreOrder) => {
     const creds = order.credentials || {};
-    const purchaseDate = creds.purchase_date || (order.created_at ? order.created_at.split('T')[0] : new Date().toISOString().split('T')[0]);
+    const purchaseDate = creds.purchase_date || (order.created_at ? getLocalDateString(new Date(order.created_at)) : getLocalDateString());
     const duration = creds.duration_days || 30;
 
     const purchaseD = new Date(purchaseDate + 'T12:00:00');
